@@ -1,0 +1,84 @@
+name: mcare
+
+x-app: &app
+  image: mcare:${IMAGE_TAG:-production}
+  env_file: .env.production
+  restart: unless-stopped
+  stop_signal: SIGTERM
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp
+    - /var/run/apache2:uid=33,gid=33,mode=0755
+    - /var/lock/apache2:uid=33,gid=33,mode=0755
+    - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0755
+  volumes:
+    - uploads:/var/www/html/storage/app/public
+    - runtime:/var/www/html/storage/framework
+  networks: [frontend, database]
+  depends_on:
+    mysql:
+      condition: service_healthy
+  pids_limit: 128
+
+services:
+  app:
+    <<: *app
+    build: .
+    mem_limit: 768m
+    cpus: 1.5
+    networks:
+      frontend:
+        aliases: [mcare-app]
+      database: {}
+    healthcheck:
+      test: [CMD, php, -r, "exit(@file_get_contents('http://127.0.0.1:8080/up') === false ? 1 : 0);"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+  queue:
+    <<: *app
+    command: [php, artisan, 'queue:work', '--sleep=3', '--tries=3', '--timeout=60', '--max-time=3600']
+    mem_limit: 256m
+    cpus: 0.5
+    stop_grace_period: 75s
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:?Set DB_DATABASE}
+      MYSQL_USER: ${DB_USERNAME:?Set DB_USERNAME}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql_root_password
+    secrets: [mysql_root_password]
+    command: ['--innodb-buffer-pool-size=256M', '--max-connections=100']
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks: [database]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 768m
+    cpus: 1.0
+    pids_limit: 256
+    healthcheck:
+      test: [CMD-SHELL, 'MYSQL_PWD="$${MYSQL_PASSWORD}" mysql -h 127.0.0.1 -u "$${MYSQL_USER}" "$${MYSQL_DATABASE}" -e "SELECT 1" >/dev/null']
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+
+networks:
+  frontend:
+    external: true
+    name: mcare_frontend
+  database:
+    internal: true
+volumes:
+  mysql-data:
+  uploads:
+  runtime:
+
+secrets:
+  mysql_root_password:
+    file: .secrets/mysql-root-password

@@ -1,0 +1,61 @@
+name: Build and deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-mcare
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: production
+      url: https://mcare.duckdns.org
+    env:
+      APP: mcare
+      DEPLOY_HOST: 62.83.10.197
+      DEPLOY_USER: github-mcare
+    steps:
+      - name: Checkout the pushed commit
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Build production image (TypeScript, Vite and Composer)
+        run: |
+          docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" --tag "$APP:$GITHUB_SHA" .
+          docker run --rm --entrypoint php "$APP:$GITHUB_SHA" artisan --version
+      - name: Configure restricted SSH access
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_SSH_KEY }}
+          HOST_KEY: ${{ secrets.PRODUCTION_SSH_HOST_KEY }}
+        run: |
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_KEY" > "$HOME/.ssh/deploy_key"
+          printf '%s\n' "$HOST_KEY" > "$HOME/.ssh/known_hosts"
+      - name: Deploy built image, migrate and verify health
+        run: |
+          set -euo pipefail
+          docker save "$APP:$GITHUB_SHA" | gzip -1 | ssh \
+            -i "$HOME/.ssh/deploy_key" -o IdentitiesOnly=yes -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 -o ServerAliveCountMax=120 \
+            "$DEPLOY_USER@$DEPLOY_HOST" "deploy $GITHUB_SHA"
+      - name: Check public HTTPS endpoint
+        run: |
+          set -euo pipefail
+          for path in up; do
+            curl --fail --silent --show-error --retry 5 --retry-delay 5 "https://mcare.duckdns.org/$path" > /dev/null
+          done
+      - name: Remove temporary SSH key
+        if: always()
+        run: rm -f "$HOME/.ssh/deploy_key"
