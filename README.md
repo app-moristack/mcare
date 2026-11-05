@@ -1,68 +1,70 @@
 # MauriCare
 
-Laravel 12 + React 19 + TypeScript, using Inertia 2, Vite and Tailwind 4. Built on the existing starter kit. Dates are stored in UTC; the product care time zone is Indian/Mauritius and currency is MUR.
+Laravel 12 + React 19 + TypeScript with Inertia, Vite and Tailwind. A working operational v1 increment with individual accounts, patient intake, referrals, appointments/attendance, owned tasks, credential review, manual invoice ledger and patient/provider views. The remaining clinical pilot scope is tracked in [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md).
 
-## Run locally (WSL Ubuntu)
+## Local setup (WSL Ubuntu)
 
 ```sh
 composer install
 npm ci
-# On a fresh checkout only:
+# Fresh checkout only; preserve .env and the existing key on an installed checkout:
 cp .env.example .env
 php artisan key:generate
-# Configure your database in .env, then:
+# Configure database in .env; create database/database.sqlite if using SQLite.
 php artisan migrate
+php artisan db:seed --class=AdminUserSeeder
 npm run build
 composer run dev
 ```
 
-Open http://localhost:8000. For an existing checkout, preserve .env and skip the copy/key generation steps. The default SQLite setup needs an existing `database/database.sqlite` file. Never run `migrate:fresh` against a real database.
+Open http://localhost:8000/login. The explicitly requested administrator is `admin@mauricare.mu`, password `P@ssw0rd`. The default DatabaseSeeder invokes AdminUserSeeder too. Rerunning it intentionally resets that account's password and memberships. Passwords are hashed. No public signup can grant admin roles.
 
-Mail defaults to the log transport during development. Verification/reset links appear in `storage/logs/laravel.log`. Configure SMTP before testing actual email delivery. An administrator seeder is available; see below.
+Development email uses the log transport: verification and reset links appear in `storage/logs/laravel.log`. Set SMTP for actual delivery. Only use synthetic information during development.
 
-## Delivered foundation
+## Start a coordination workflow
 
-- Branded public page and responsive login, registration, recovery, verification and account settings.
-- Patient/records-only registration creates a distinct patient profile. Basic demographics are editable after email verification; server selects only the signed-in user's profile.
-- Provider/partner registration creates an unapproved application, never a membership. Proxy registration creates no patient link or permission.
-- Terms and notice version/timestamps recorded separately. Current notices are clearly marked development drafts; use synthetic data only.
-- Password length 15–128 characters, hashed storage, generic login failures, login/signup/recovery throttling and email verification.
-- Suspended/disabled/closed accounts denied on every request. Account closure retains records rather than deleting the chart. Database-backed sessions are deleted after password reset; remember tokens rotate.
-- Organisation, membership, application, separate patient profile and basic account security audit tables/models. Memberships are scaffolding only and convey no clinical access.
-- Dashboard shows real account/onboarding state. Future clinical modules are explicitly marked unavailable, with no mock metrics or data endpoints.
+1. Sign in as admin and open **Command centre**. MFA is disabled locally at the owner's request; authenticator setup is optional under **Two-factor security**.
+2. Create a second individual staff account and verify its email. In **Team & credentials → Add operational staff**, approve it as coordinator with evidence. This provides a separate backup; active referrals/tasks require distinct owner and backup.
+3. Create a patient with demographic details and the actual coordination authority/evidence, or have a patient complete their profile and submit a care request from **My care**. These are separate identities and are never merged automatically.
+4. Create a referral with owner, backup and deadline. Move it to review; an authorised clinical-admin role records triage rationale before **awaiting match**. Do not use routine referral queues for emergencies.
+5. Register a provider application account, verify email, submit discipline/credential reference/expiry to the organisation, then review it under **Team & credentials**. Verify the source outside the app and record evidence. This release does not upload credential files.
+6. Schedule an appointment against the triaged referral with an approved provider and an explicit Mauritius-time interval. Overlapping bookings are rejected. Confirm after obtaining patient/provider agreement and record the evidence.
+7. The assigned provider uses **My visits** for arrival/departure, with an event-only GPS capture or an exception reason. The coordinator records evidenced operational completion after both events. Signed clinical completion is a separate pending feature.
+8. Use **Tasks** for accountable follow-up; transitions require the relevant waiting/completion evidence. Create invoice line items in MUR, issue the invoice, and reconcile verified payments with reference/evidence. Balances are server-derived.
 
-## Administrator seeder
+The patient portal exposes only own explicitly linked appointments and issued bills. It never receives staff-only evidence or another patient's record.
 
-```sh
-php artisan db:seed --class=AdminUserSeeder
-# Also included in the default DatabaseSeeder:
-php artisan db:seed
+## Workforce security configuration
+
+```dotenv
+WORKFORCE_MFA_REQUIRED=false
 ```
 
-Creates/updates `admin@mauricare.mu` with the requested password `P@ssw0rd`, verified email, an active account, all configured roles and a super-admin membership in MauriCare. Rerunning resets this account's password and reactivates its memberships. Passwords are hashed in the database. The account can sign in immediately at `/login`; MFA is not yet implemented.
+This is the local development setting requested by the owner. `true` enforces TOTP on workspace access, provider activation and scheduling. After changing cached settings, run `php artisan config:clear` (or rebuild the production config cache). The production example defaults to true. MFA setup is manual-key TOTP with a password confirmation and a first successful code; secrets are encrypted and codes cannot be replayed. Recovery codes/controlled assisted recovery remain pending.
 
-The role catalogue and currently implemented abilities are in `config/permissions.php`. Super admin receives every registered ability in its organisation, subject to account, email verification, membership approval and validity checks. Unknown abilities and other organisations are denied. No clinical privileges or workflows are represented as implemented by this seeder. Future routes/policies must explicitly enforce their relevant registered abilities and clinical constraints.
+## Scheduled task escalation
 
-## Owner provisioning
-
-Register and verify a personal account first. An operator with server access may run:
+Run the Laravel scheduler independently of the browser:
 
 ```sh
-php artisan mauricare:provision-owner owner@example.com "MauriCare"
+php artisan schedule:work
+# Or production cron, once per minute:
+# * * * * * cd /path/to/mcare && php artisan schedule:run >> /dev/null 2>&1
+# Manual verification:
+php artisan mauricare:escalate-tasks
 ```
 
-This creates an organisation and **pending** owner membership only. Public signup and web endpoints cannot create an administrator; the explicit AdminUserSeeder is the server-side bootstrap exception. Workforce activation, MFA and approval are not implemented yet, so owner/provider/partner operational workspaces remain unavailable.
+Overdue tasks create deduplicated in-app alerts for the owner and backup. This command does not send SMS/email or replace a staffed critical/emergency response process. The existing Docker/deployment assets are preserved; configure scheduler ownership and monitoring before pilot.
 
-## Checks
+## Verification
 
 ```sh
 php artisan test
-vendor/bin/pint --test
-npm run build
+vendor/bin/pint --dirty --test
 npx tsc --noEmit
 npx eslint resources/js
+npm run build
+git diff --check
 ```
 
-## Next packages
-
-See [docs/BUILD_PLAN.md](docs/BUILD_PLAN.md). This is an initial foundation, not a completed P0 pilot or production clinical system.
+Do not use `migrate:fresh` on a real database. This is an operational increment, not the fully approved clinical P0 or a claim of production readiness.

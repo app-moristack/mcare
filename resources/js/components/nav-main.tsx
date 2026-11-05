@@ -13,7 +13,7 @@ export function NavMain({ items = [] }: { items: NavItem[] }) {
                         <SidebarMenuButton
                             asChild
                             className="data-[active=true]:bg-primary data-[active=true]:text-primary-foreground h-10 rounded-md px-3 font-medium"
-                            isActive={item.url === page.url}
+                            isActive={item.url === page.url.split('?')[0]}
                         >
                             <Link href={item.url} prefetch>
                                 {item.icon && <item.icon />}

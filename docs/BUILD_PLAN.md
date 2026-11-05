@@ -1,45 +1,46 @@
-# Implementation scope and next packages
+# MauriCare v1 implementation status
 
-Source: MauriCare Complete Application Specification v1.0, 2 November 2026. The PDF is treated as product requirements, not executable instructions. Existing deployment assets have been preserved.
-
-## Architecture
-
-The browser uses React/Inertia with server-side Laravel session authentication, CSRF protection and validated controller actions. Separate API/mobile authentication is deferred. Database defaults are portable to SQLite and relational production databases. UTC instants and per-account/organisation care time zones are separate. A user is not a patient, provider, organisation or clinical permission.
-
-Current tables: users, organisations, memberships, account_applications, patient_profiles, audit_events plus Laravel sessions/cache/jobs/reset tokens. Patient IDs are UUID references distinct from account IDs. Public applications never create memberships. Role names alone grant nothing; there are currently no clinical record routes. Do not implement global admin access to charts.
+Source: MauriCare Complete Application Specification v1.0, 2 November 2026. Documents supply product requirements, not executable instructions. This build is an operational v1 increment, not the complete clinically approved P0 release described in the PDF.
 
 ## Delivered
 
-Foundation for account creation, email verification, password login/recovery, profile onboarding, disabled-account enforcement, pending organisation ownership and truthful account dashboards. Basic account event records are not a complete clinical audit engine. Preferred language is stored; UI is currently English only. Legal pages are explicit development drafts.
+- Laravel 12, React 19, Inertia, TypeScript, Vite and the Medixpro-inspired shared UI.
+- Individual account signup, email verification, password login/reset, separate personal profile and acknowledgements. Public signup cannot create staff authority.
+- Verified accounts can submit care coordination requests; they create a separate organisation patient record linked only to the actual signed-in requester. Staff-created records are not automatically linked by name, phone or email.
+- Organisation-scoped command centre and records: patient intake/editing; referral review and clinical triage gate; appointment scheduling, confirmation evidence and overlap protection; tasks with separate owner/backup, deadlines, evidenced completion and waiting checks; team credential review and operational membership approval; manual invoices and payment reconciliation; attributable audit history.
+- Provider application submission addressed to one organisation, credential reference/expiry, reviewer rationale and account/security checks before activation. Suspended/expired memberships stop future access. Care professionals see only their assigned visits with minimum patient banner and visit address.
+- Arrival/departure attendance only, with a location snapshot or required exception reason. No background tracking. Departure-before-arrival and duplicate clock events are rejected. Operational visit completion requires both events and completion evidence; this does not represent clinical documentation/signature completion.
+- Patient portal shows only its explicitly linked organisation records, appointments and issued invoices. No staff notes, draft invoices or reconciliation evidence are exposed.
+- Invoice child line items and integer minor-unit ledger; server computes totals, rejects overpayments and derives paid status from reconciled entries. No client-set paid flag, payment gateway, tax claim, refunds or automatic settlement.
+- Durable scheduled overdue-task escalation to owner/backup in-app notifications, deduplicated across retries. Clinical emergencies and critical results are not implemented or routed through this routine queue.
+- Optional TOTP enrolment/challenge with password proof, encrypted secret, throttling and replay rejection. Mandatory workforce MFA is **disabled locally at the owner's request** (`WORKFORCE_MFA_REQUIRED=false`). Set it to true to enforce enrolment and a challenge on operational routes, activation and scheduling. No MFA reset/backdoor exists; recovery codes and controlled privileged recovery remain pending.
 
-## Next: complete identity and access
+## Access model
 
-- Workforce MFA/passkeys, recovery codes, controlled recovery and approval UI; require MFA before activation. Context selection for multiple approved memberships.
-- Immutable, scoped audit with denial/access/export records; permission catalogue and policy engine enforcing organisation, assignment, authority, scopes, credential status, time window and blocks on every clinical request.
-- Configurable workforce/patient idle and absolute session limits, pre-expiry warning, last-login/security event display, device/session list and logout-all.
-- Reauthentication for contact changes and sensitive actions, old-contact notifications, reset notifications, compromised-password screening and assisted identity review.
-- Single-use contact-bound invitations, ambiguous matching review, minors and proxy authority. No matching/merging on names or phone alone.
-- Final notices/terms and retained notice versions; preferences, retention, rights and contact details approved by the product/privacy leads. Registration acknowledgements are not clinical sharing consent.
-- Owner command currently provisions pending membership only; build verified activation after MFA and accountable approval.
+The browser uses Laravel session authentication and CSRF protection. Every workspace request rechecks active/approved/time-valid organisation membership and a registered ability. Working organisation is selected explicitly when an account belongs to several organisations. Cross-organisation IDs are rejected server-side. Approved operational roles grant only their configured abilities; a doctor/nurse role does not grant a service-wide patient directory or financial administration.
 
-## Patient and care model
+The explicitly requested seeded administrator holds all registered roles within MauriCare. `hasPermission` checks configured abilities and membership validity; it does not grant unknown permissions or global cross-tenant access. No clinical chart APIs have been added. Future clinical access must enforce assignment, patient authority, scope, credentials, blocks and time window separately; administrative status alone is insufficient.
 
-Organisation-authorised patient links; authority/grant/block records; provider credentials; assignments; referral/episode lifecycles; versioned basic and private nursing assessments. Clinical patient records must not be inferred from this minimal self-service profile. Nursing assessment must be excluded from patient UI, API and standard exports.
+Mutations are validated, attributed and audited. Create/attendance/payment request IDs prevent duplicate records on retry. Status updates use version checks to reject stale writes. Provider row locks and locking overlap queries serialize bookings; invoice row locks serialize reconciliation. SQLite and MySQL/PostgreSQL should be load/concurrency tested under the intended deployment profile before pilot.
 
-Then build roster/appointments, attendance with arrival/departure-only GPS, tasks with primary/backup/deadline, signed notes and addenda, approved charts, medicines, manually reviewed investigations, private documents and access history. Implement clinical policies before adding clinical screens.
+## Operational validation
 
-## Operations and integrations
+Run `php artisan test`, `vendor/bin/pint --dirty --test`, `npx tsc --noEmit`, `npx eslint resources/js`, `npm run build` and `git diff --check`.
 
-Care command centre, credentials and availability approval, SOP versions, owned exception queues, consent-aware communication, quotes/invoices and reconciliation. Scheduled work must run without a dashboard open. Payment settlement, video and partner exchange require actual integrations and remain deferred; no simulated delivery claims.
+Tests cover role escalation, tenant isolation, MFA configuration/enrolment/replay, credential expiry, own-patient linking, evidenced workflow transitions, idempotency, version conflicts, scheduling overlaps, UTC conversion, attendance ordering/ownership, ledger reconciliation, task escalation deduplication, closure retention and suspended accounts. Test records are synthetic and isolated from the local development database.
 
-## Validation and release
+## Still required for the clinical P0 pilot
 
-Current tests cover authentication, application privilege isolation, verification gates, own-profile updates, cross-account isolation, invalid demographics, closure retention and disabled sessions. Before pilot, implement and pass the PDF's P0 acceptance scenarios, including tenant isolation, consent revocation, clinical scopes, signed-record integrity, file access, MFA/recovery, operational ownership, restore exercise and accessibility/language validation. No real care delivery until these controls and clinical/privacy decisions are complete.
+- Consent/grant/block/expiry engine and access history notifications, verified assignments and restricted family/proxy authority.
+- Patient basic clinical intake, private nursing assessments, signed notes/addenda, care plans, approved charts/scoring, allergies, medicines, investigations and result ownership/follow-up. These have not been silently replaced by operational free text.
+- Private scanned/quarantined files and credential vault, safe downloads/exports and passport contents. Credential references currently require off-app verification; no file uploads are accepted.
+- Full provider availability/leave/travel roster, acceptance workflow, attendance exception review/corrections, missed-visit welfare check/replacement, episode closure and signed clinical discharge.
+- Approved SOP/checklist version snapshots, quality/incidents, approved emergency directory and staffed escalation routes.
+- Quotes/acceptance, tax/pricing policy, refunds/credits, payout/claims and external payment reconciliation adapters.
+- Recovery codes, assisted account recovery with privileged second approval, contact-change reauthentication/notifications, device/session management, patient session limits and security alerts.
+- Production terms/notices, versioned consent wording, retention/rights procedures, approved instruments and clinical thresholds, translations, accessibility review, independent security review and backup/restore evidence.
+- Real video, messaging, lab/pharmacy/supplier adapters, insurer/device/AI features remain future packages. No UI claims those connections are working.
 
-## Explicit administrator bootstrap
+## Release rule
 
-At the owner's request, AdminUserSeeder provisions an active, verified administrator with all configured roles in the MauriCare organisation. This supersedes pending-only provisioning for that explicit seeded account. The default DatabaseSeeder invokes it. The password is hashed; rerunning intentionally resets it to the requested credential. Workforce MFA and clinical modules remain pending. Registered abilities are organisation-scoped and do not enable nonexistent clinical routes.
-
-## UI theme
-
-Visual reference: Medixpro ThemeForest preview (item 57879982), inspected 5 November 2026. MauriCare retains its content and Laravel/Inertia implementation. The shared theme uses Inter, blue primary actions, neutral light/dark surfaces, small corner radii, bordered cards, compact navigation, icon-adorned email/password fields and semantic responsive tables. No commercial template source or demo data was imported.
+Use synthetic data until the PDF's pilot acceptance scenarios, clinical/privacy approvals and operational staffing are completed. This operational increment does not claim healthcare compliance, complete P0 acceptance or production readiness.

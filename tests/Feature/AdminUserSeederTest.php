@@ -52,11 +52,11 @@ class AdminUserSeederTest extends TestCase
         $this->assertFalse($ordinary->hasPermission('dashboard.view'));
         $this->seed(AdminUserSeeder::class);
         $admin = User::where('email', 'admin@mauricare.mu')->firstOrFail();
-        $admin->memberships()->where('role', 'super_admin')->update(['ends_at' => now()->subMinute()]);
+        $admin->memberships()->update(['ends_at' => now()->subMinute()]);
         $this->assertFalse($admin->hasPermission('dashboard.view'));
-        $admin->memberships()->where('role', 'super_admin')->update(['ends_at' => null, 'status' => 'suspended']);
+        $admin->memberships()->update(['ends_at' => null, 'status' => 'suspended']);
         $this->assertFalse($admin->hasPermission('dashboard.view'));
-        $admin->memberships()->where('role', 'super_admin')->update(['status' => 'active']);
+        $admin->memberships()->update(['status' => 'active']);
         $admin->forceFill(['account_status' => 'disabled'])->save();
         $this->assertFalse($admin->hasPermission('dashboard.view'));
     }

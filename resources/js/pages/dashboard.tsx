@@ -57,6 +57,12 @@ export default function Dashboard({
                             Your administrator account has all registered roles and permissions for MauriCare. Clinical and operations modules will
                             appear as they are implemented.
                         </p>
+                        <Link
+                            href="/workspace/overview"
+                            className="bg-primary text-primary-foreground mt-5 inline-flex items-center gap-3 rounded-md px-5 py-3 text-sm font-medium"
+                        >
+                            Open command centre <ArrowUpRight className="size-4" />
+                        </Link>
                         <h3 className="mt-6 font-semibold">Assigned roles</h3>
                         <div className="mt-4 max-h-80 overflow-auto rounded-md border">
                             <Table aria-label="Assigned administrator roles">
@@ -89,9 +95,12 @@ export default function Dashboard({
                     <section className="bg-card rounded-lg border p-6 shadow-xs">
                         <ShieldCheck className="size-9 text-blue-600" />
                         <h2 className="mt-4 text-2xl font-semibold">Your application is awaiting review</h2>
+                        <Link href="/application" className="text-primary mt-4 inline-block font-medium underline">
+                            Complete your professional application
+                        </Link>
                         <p className="text-muted-foreground mt-3 max-w-xl leading-relaxed">
                             Thank you for applying to join MauriCare. Professional and partner access requires identity, credentials, organisation
-                            approval and workforce MFA. Your account currently has no staff or patient-record access.
+                            approval. Optional authenticator security is available. Your account currently has no staff or patient-record access.
                         </p>
                     </section>
                 ) : patientProfile ? (

@@ -56,7 +56,7 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return $this->memberships()
-            ->where('role', 'super_admin')
+            ->whereIn('role', collect(config('permissions.grants'))->filter(fn ($abilities) => in_array('*', $abilities, true) || in_array($ability, $abilities, true))->keys())
             ->where('status', 'active')
             ->whereNotNull('approved_by')
             ->where('starts_at', '<=', now())
@@ -68,6 +68,8 @@ class User extends Authenticatable implements MustVerifyEmail
     protected $hidden = [
         'password',
         'remember_token',
+        'mfa_secret',
+        'mfa_last_counter',
     ];
 
     /**
@@ -80,6 +82,8 @@ class User extends Authenticatable implements MustVerifyEmail
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'mfa_secret' => 'encrypted',
+            'mfa_confirmed_at' => 'datetime',
             'last_login_at' => 'datetime',
             'terms_accepted_at' => 'datetime',
             'privacy_acknowledged_at' => 'datetime',

@@ -22,6 +22,14 @@ export interface NavItem {
 }
 
 export interface SharedData {
+    workspace: {
+        organisation_id: number | null;
+        organisations: { id: number; name: string }[];
+        permissions: string[];
+        mfa_enrolled: boolean;
+        notifications: { id: number; message: string; url: string }[];
+    } | null;
+    flash: { success?: string };
     name: string;
     quote: { message: string; author: string };
     auth: Auth;

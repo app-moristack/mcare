@@ -2,8 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Organisation;
+use App\Services\Workspace;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -42,6 +45,21 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
+            'flash' => ['success' => $request->session()->get('success')],
+            'workspace' => function () use ($request) {
+                if (! $request->user()) {
+                    return null;
+                }
+                $ids = Workspace::memberships($request->user())->pluck('organisation_id')->unique()->values();
+                $id = (int) $request->session()->get('organisation_id', $ids->count() === 1 ? $ids->first() : 0);
+
+                return ['organisation_id' => $ids->contains($id) ? $id : null,
+                    'organisations' => Organisation::whereIn('id', $ids)->get(['id', 'name']),
+                    'permissions' => $ids->contains($id) ? collect(config('permissions.abilities'))->filter(fn ($a) => $request->user()->hasPermission($a, $id))->values() : [],
+                    'mfa_enrolled' => (bool) $request->user()->mfa_confirmed_at,
+                    'notifications' => DB::table('operation_notifications')->where('user_id', $request->user()->id)->whereIn('organisation_id', $ids)->whereNull('read_at')->latest()->limit(5)->get(['id', 'message', 'url']),
+                ];
+            },
             'auth' => [
                 'user' => $request->user(),
             ],
