@@ -1,35 +1,183 @@
-import { PlaceholderPattern } from '@/components/ui/placeholder-pattern';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head } from '@inertiajs/react';
-
-const breadcrumbs: BreadcrumbItem[] = [
-    {
-        title: 'Dashboard',
-        href: '/dashboard',
-    },
-];
-
-export default function Dashboard() {
+import { SharedData } from '@/types';
+import { Head, Link, usePage } from '@inertiajs/react';
+import { ArrowUpRight, CheckCircle2, Circle, ClipboardList, FileHeart, ShieldCheck, Users } from 'lucide-react';
+type Profile = { public_id: string; onboarding_completed_at: string | null } | null;
+export default function Dashboard({
+    patientProfile,
+    application,
+    adminAccess,
+}: {
+    patientProfile: Profile;
+    application: { status: string } | null;
+    adminAccess: { roles: string[]; permissions: string[] } | null;
+}) {
+    const { auth } = usePage<SharedData>().props;
+    const verified = !!auth.user.email_verified_at;
+    const complete = !!patientProfile?.onboarding_completed_at;
+    const tasks = [verified, complete, false];
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Dashboard" />
-            <div className="flex h-full flex-1 flex-col gap-4 rounded-xl p-4">
-                <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
+        <AppLayout breadcrumbs={[{ title: 'Overview', href: '/dashboard' }]}>
+            <Head title="Your overview" />
+            <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 p-4 md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                        <p className="text-muted-foreground text-xs tracking-widest uppercase">Your MauriCare space</p>
+                        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Welcome, {auth.user.name.split(' ')[0]}.</h1>
+                        <p className="text-muted-foreground mt-2">Let’s get your account ready for your care journey.</p>
                     </div>
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
-                    <div className="border-sidebar-border/70 dark:border-sidebar-border relative aspect-video overflow-hidden rounded-xl border">
-                        <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
-                    </div>
+                    <span className="bg-accent text-accent-foreground rounded-full px-4 py-2 text-xs font-medium">
+                        {adminAccess
+                            ? 'Administrator'
+                            : application
+                              ? 'Application pending'
+                              : auth.user.account_kind === 'proxy'
+                                ? 'Representative account'
+                                : 'Personal account'}
+                    </span>
                 </div>
-                <div className="border-sidebar-border/70 dark:border-sidebar-border relative min-h-[100vh] flex-1 rounded-xl border md:min-h-min">
-                    <PlaceholderPattern className="absolute inset-0 size-full stroke-neutral-900/20 dark:stroke-neutral-100/20" />
+                {!verified && (
+                    <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-5 text-amber-950">
+                        <div>
+                            <h2 className="font-semibold">Verify your email address</h2>
+                            <p className="mt-1 text-sm">Check your inbox before adding personal information.</p>
+                        </div>
+                        <Link href="/verify-email" className="text-sm font-semibold underline">
+                            Verify email
+                        </Link>
+                    </div>
+                )}
+                {adminAccess ? (
+                    <section className="bg-card rounded-lg border p-6 shadow-xs">
+                        <ShieldCheck className="size-9 text-blue-600" />
+                        <h2 className="mt-4 text-2xl font-semibold">Administration workspace</h2>
+                        <p className="text-muted-foreground mt-3">
+                            Your administrator account has all registered roles and permissions for MauriCare. Clinical and operations modules will
+                            appear as they are implemented.
+                        </p>
+                        <h3 className="mt-6 font-semibold">Assigned roles</h3>
+                        <div className="mt-4 max-h-80 overflow-auto rounded-md border">
+                            <Table aria-label="Assigned administrator roles">
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Role</TableHead>
+                                        <TableHead>Assignment</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {adminAccess.roles.map((role) => (
+                                        <TableRow key={role}>
+                                            <TableCell className="font-medium capitalize">{role.replaceAll('_', ' ')}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="success">Assigned</Badge>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </div>
+                        <h3 className="mt-6 font-semibold">Current permissions</h3>
+                        <ul className="mt-3 space-y-2 text-sm">
+                            {adminAccess.permissions.map((permission) => (
+                                <li key={permission}>{permission}</li>
+                            ))}
+                        </ul>
+                    </section>
+                ) : application ? (
+                    <section className="bg-card rounded-lg border p-6 shadow-xs">
+                        <ShieldCheck className="size-9 text-blue-600" />
+                        <h2 className="mt-4 text-2xl font-semibold">Your application is awaiting review</h2>
+                        <p className="text-muted-foreground mt-3 max-w-xl leading-relaxed">
+                            Thank you for applying to join MauriCare. Professional and partner access requires identity, credentials, organisation
+                            approval and workforce MFA. Your account currently has no staff or patient-record access.
+                        </p>
+                    </section>
+                ) : patientProfile ? (
+                    <section className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
+                        <div className="bg-primary rounded-lg p-7 text-white">
+                            <span className="text-xs tracking-widest text-white/80 uppercase">Getting started</span>
+                            <h2 className="mt-4 text-2xl font-medium">A few steps to make it yours</h2>
+                            <p className="mt-3 text-sm text-white/80">{tasks.filter(Boolean).length} of 3 steps complete</p>
+                            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/15">
+                                <div className="h-full rounded-full bg-blue-300" style={{ width: `${(tasks.filter(Boolean).length / 3) * 100}%` }} />
+                            </div>
+                            <div className="mt-7 space-y-5">
+                                {[
+                                    ['Verify your email', verified],
+                                    ['Complete your basic details', complete],
+                                    ['Identity review — not yet available', false],
+                                ].map(([label, done]) => (
+                                    <div key={String(label)} className="flex items-center gap-3 text-sm">
+                                        {done ? <CheckCircle2 className="size-5 text-white/80" /> : <Circle className="size-5 text-white/50" />}
+                                        {label}
+                                    </div>
+                                ))}
+                            </div>
+                            <Link
+                                href={verified ? '/onboarding' : '/verify-email'}
+                                className="mt-8 inline-flex items-center gap-6 rounded-lg bg-white px-5 py-3 text-sm font-semibold text-blue-950"
+                            >
+                                {complete ? 'Review your details' : 'Continue setup'}
+                                <ArrowUpRight className="size-4" />
+                            </Link>
+                        </div>
+                        <div className="bg-card rounded-lg border p-6 shadow-xs">
+                            <FileHeart className="size-9 text-blue-600" />
+                            <h2 className="mt-5 text-xl font-semibold">Your personal profile</h2>
+                            <p className="text-muted-foreground mt-3 text-sm leading-relaxed">
+                                Account verification and clinical identity are separate. Your identity status is{' '}
+                                <strong>{auth.user.identity_status}</strong>.
+                            </p>
+                            <p className="text-muted-foreground mt-6 text-xs">Profile reference</p>
+                            <p className="mt-2 font-mono text-xs break-all">{patientProfile.public_id}</p>
+                            <p className="text-muted-foreground mt-6 text-xs">
+                                Care time zone: Indian/Mauritius
+                                <br />
+                                Currency: MUR
+                            </p>
+                        </div>
+                    </section>
+                ) : (
+                    <section className="bg-card rounded-lg border p-6 shadow-xs">
+                        <Users className="text-blue-600" />
+                        <h2 className="mt-4 text-xl font-semibold">Representative access needs separate approval</h2>
+                        <p className="text-muted-foreground mt-2">
+                            Creating this account does not grant access to another person’s records. Patient linking and authority review will be
+                            added in a later phase.
+                        </p>
+                    </section>
+                )}
+                <section>
+                    <h2 className="text-lg font-semibold">Your care, taking shape</h2>
+                    <p className="text-muted-foreground mt-1 text-sm">These services are planned for the next build phases.</p>
+                    <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                        {[
+                            [ClipboardList, 'Appointments', 'Your upcoming care visits.'],
+                            [FileHeart, 'Health records', 'Your patient-visible care information.'],
+                            [Users, 'Care team', 'Your approved care relationships.'],
+                        ].map(([Icon, title, body]) => {
+                            const I = Icon as typeof Users;
+                            return (
+                                <div key={String(title)} className="bg-card rounded-lg border p-5 shadow-xs">
+                                    <I className="size-5 text-blue-600" />
+                                    <h3 className="mt-4 font-medium">{String(title)}</h3>
+                                    <p className="text-muted-foreground mt-2 text-sm">{String(body)}</p>
+                                    <span className="text-muted-foreground bg-muted mt-5 inline-block rounded-full px-3 py-1 text-xs">
+                                        Coming later
+                                    </span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+                <div className="flex flex-wrap justify-between gap-4 border-t pt-5 text-sm">
+                    <Link href="/settings/profile" className="font-medium underline">
+                        Account settings
+                    </Link>
                 </div>
-            </div>
+            </main>
         </AppLayout>
     );
 }

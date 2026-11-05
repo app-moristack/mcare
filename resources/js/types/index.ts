@@ -32,6 +32,10 @@ export interface User {
     id: number;
     name: string;
     email: string;
+    account_kind: 'admin' | 'self_patient' | 'records_only' | 'proxy' | 'provider_application' | 'partner_application';
+    preferred_language: string;
+    identity_status: string;
+    last_login_at: string | null;
     avatar?: string;
     email_verified_at: string | null;
     created_at: string;

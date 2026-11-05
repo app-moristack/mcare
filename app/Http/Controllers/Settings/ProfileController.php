@@ -53,7 +53,7 @@ class ProfileController extends Controller
 
         Auth::logout();
 
-        $user->delete();
+        $user->forceFill(['account_status' => 'closed', 'remember_token' => null])->save();
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
