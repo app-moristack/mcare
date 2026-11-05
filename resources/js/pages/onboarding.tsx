@@ -26,7 +26,7 @@ export default function Onboarding({ profile }: { profile: Profile }) {
         >
             <Head title="Your basic details" />
             <main className="mx-auto w-full max-w-2xl p-6 md:p-10">
-                <p className="text-xs tracking-widest text-blue-700 uppercase">Getting started</p>
+                <p className="text-primary text-xs tracking-widest uppercase">Getting started</p>
                 <h1 className="mt-3 text-3xl font-semibold">Let’s start with you.</h1>
                 <p className="text-muted-foreground mt-3 leading-relaxed">
                     Add your basic details. This does not verify your identity or replace a clinical assessment.

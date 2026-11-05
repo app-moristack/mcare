@@ -4,7 +4,7 @@ Source: MauriCare Complete Application Specification v1.0, 2 November 2026. Docu
 
 ## Delivered
 
-- Laravel 12, React 19, Inertia, TypeScript, Vite and the Medixpro-inspired shared UI.
+- Laravel 12, React 19, Inertia, TypeScript, Vite and the shared glass UI (see THEME.md).
 - Individual account signup, email verification, password login/reset, separate personal profile and acknowledgements. Public signup cannot create staff authority.
 - Verified accounts can submit care coordination requests; they create a separate organisation patient record linked only to the actual signed-in requester. Staff-created records are not automatically linked by name, phone or email.
 - Organisation-scoped command centre and records: patient intake/editing; referral review and clinical triage gate; appointment scheduling, confirmation evidence and overlap protection; tasks with separate owner/backup, deadlines, evidenced completion and waiting checks; team credential review and operational membership approval; manual invoices and payment reconciliation; attributable audit history.

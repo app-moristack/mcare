@@ -7,7 +7,11 @@ interface AppContentProps extends React.ComponentProps<'div'> {
 
 export function AppContent({ variant = 'header', children, ...props }: AppContentProps) {
     if (variant === 'sidebar') {
-        return <SidebarInset {...props}>{children}</SidebarInset>;
+        return (
+            <SidebarInset className="glass-content" {...props}>
+                {children}
+            </SidebarInset>
+        );
     }
 
     return (

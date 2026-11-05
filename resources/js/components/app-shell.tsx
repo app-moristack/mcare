@@ -7,13 +7,13 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, variant = 'header' }: AppShellProps) {
-    const [isOpen, setIsOpen] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('sidebar') !== 'false' : true));
+    const [isOpen, setIsOpen] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('mcare-sidebar-expanded') !== 'false' : true));
 
     const handleSidebarChange = (open: boolean) => {
         setIsOpen(open);
 
         if (typeof window !== 'undefined') {
-            localStorage.setItem('sidebar', String(open));
+            localStorage.setItem('mcare-sidebar-expanded', String(open));
         }
     };
 
@@ -22,7 +22,7 @@ export function AppShell({ children, variant = 'header' }: AppShellProps) {
     }
 
     return (
-        <SidebarProvider defaultOpen={isOpen} open={isOpen} onOpenChange={handleSidebarChange}>
+        <SidebarProvider className="glass-workspace" defaultOpen={isOpen} open={isOpen} onOpenChange={handleSidebarChange}>
             {children}
         </SidebarProvider>
     );

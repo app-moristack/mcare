@@ -9,7 +9,7 @@ export function AppSidebarHeader({ breadcrumbs = [] }: { breadcrumbs?: Breadcrum
     const { auth, workspace } = usePage<SharedData>().props;
     const initials = useInitials();
     return (
-        <header className="bg-card flex h-18 shrink-0 items-center justify-between gap-4 border-b px-4 md:px-6">
+        <header className="glass-topbar flex shrink-0 items-center justify-between gap-4">
             <div className="flex min-w-0 items-center gap-3">
                 <SidebarTrigger />
                 <div className="hidden sm:block">

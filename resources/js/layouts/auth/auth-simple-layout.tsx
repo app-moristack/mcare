@@ -20,7 +20,7 @@ export default function AuthSimpleLayout({ children, title, description }: AuthL
                     </Link>
                     <p className="text-muted-foreground mt-2 text-sm">Care, connected.</p>
                 </div>
-                <main className="surface p-5 sm:p-6">
+                <main className="surface glass-auth-card">
                     <div className="mb-7">
                         <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
                         <p className="text-muted-foreground mt-2 text-sm leading-relaxed">{description}</p>

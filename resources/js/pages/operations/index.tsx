@@ -490,12 +490,8 @@ export default function Operations({
                             ].map(([Icon, label, count, target]) => {
                                 const I = Icon as typeof Users;
                                 return (
-                                    <Link
-                                        href={`/workspace/${String(target)}`}
-                                        key={String(label)}
-                                        className="surface p-5 transition-shadow hover:shadow-md"
-                                    >
-                                        <I className="text-primary size-5" />
+                                    <Link href={`/workspace/${String(target)}`} key={String(label)} className="surface metric-card">
+                                        <I className="metric-icon" />
                                         <h2 className="mt-4 text-sm font-medium">{String(label)}</h2>
                                         <p className="mt-3 text-3xl font-semibold">{String(count)}</p>
                                     </Link>

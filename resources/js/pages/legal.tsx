@@ -5,7 +5,7 @@ export default function Legal({ kind }: { kind: 'terms' | 'privacy' }) {
         <>
             <Head title={title} />
             <main className="mx-auto max-w-2xl px-6 py-16">
-                <Link href="/" className="font-semibold text-blue-700">
+                <Link href="/" className="text-primary font-semibold">
                     ← MauriCare
                 </Link>
                 <p className="text-muted-foreground mt-10 text-sm">Draft version · 5 November 2026</p>
