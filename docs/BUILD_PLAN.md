@@ -13,7 +13,7 @@ Source: MauriCare Complete Application Specification v1.0, 2 November 2026. Docu
 - Patient portal shows only its explicitly linked organisation records, appointments and issued invoices. No staff notes, draft invoices or reconciliation evidence are exposed.
 - Invoice child line items and integer minor-unit ledger; server computes totals, rejects overpayments and derives paid status from reconciled entries. No client-set paid flag, payment gateway, tax claim, refunds or automatic settlement.
 - Durable scheduled overdue-task escalation to owner/backup in-app notifications, deduplicated across retries. Clinical emergencies and critical results are not implemented or routed through this routine queue.
-- Optional TOTP enrolment/challenge with password proof, encrypted secret, throttling and replay rejection. Mandatory workforce MFA is **disabled locally at the owner's request** (`WORKFORCE_MFA_REQUIRED=false`). Set it to true to enforce enrolment and a challenge on operational routes, activation and scheduling. No MFA reset/backdoor exists; recovery codes and controlled privileged recovery remain pending.
+- Optional TOTP enrolment/challenge with password proof, encrypted secret, throttling and replay rejection. Mandatory workforce MFA defaults to **disabled at the owner's request**, including the production example (`WORKFORCE_MFA_REQUIRED=false`). The requirement is temporarily pinned to false in configuration so redeployment also disables it on servers with an existing true environment value. Restoring enforcement requires a code/config change. No MFA reset/backdoor exists; recovery codes and controlled privileged recovery remain pending.
 
 ## Access model
 

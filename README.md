@@ -36,11 +36,9 @@ The patient portal exposes only own explicitly linked appointments and issued bi
 
 ## Workforce security configuration
 
-```dotenv
-WORKFORCE_MFA_REQUIRED=false
-```
+Mandatory workforce MFA is temporarily disabled directly in `config/mauricare.php`, at the owner's request. Redeploying this version disables the requirement even if the server's existing environment still sets `WORKFORCE_MFA_REQUIRED=true`. The container entrypoint rebuilds Laravel's configuration cache during startup. No server environment edit is needed for this release.
 
-This is the local development setting requested by the owner. `true` enforces TOTP on workspace access, provider activation and scheduling. After changing cached settings, run `php artisan config:clear` (or rebuild the production config cache). The production example defaults to true. MFA setup is manual-key TOTP with a password confirmation and a first successful code; secrets are encrypted and codes cannot be replayed. Recovery codes/controlled assisted recovery remain pending.
+Authenticator setup remains optional. To require MFA in a future release, restore the configuration flag's environment lookup and set it to true. MFA setup uses manual-key TOTP with password confirmation and a first successful code; secrets are encrypted and codes cannot be replayed. Recovery codes/controlled assisted recovery remain pending.
 
 ## Scheduled task escalation
 
