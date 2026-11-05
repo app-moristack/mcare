@@ -14,10 +14,26 @@ class Workspace
             ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>', now()))->get();
     }
 
+    public static function selectedOrganisation(Request $request): int
+    {
+        if ($request->session()->has('organisation_id')) {
+            return (int) $request->session()->get('organisation_id');
+        }
+        $memberships = self::memberships($request->user());
+        $ids = $memberships->pluck('organisation_id')->unique()->values();
+        if ($ids->count() === 1) {
+            return (int) $ids->first();
+        }
+        // Adding the optional demo workspace must not remove the seeded owner's primary context.
+        $owned = $memberships->where('role', 'owner')->pluck('organisation_id')->unique()->values();
+
+        return $request->user()->account_kind === 'admin' && $owned->count() === 1 ? (int) $owned->first() : 0;
+    }
+
     public static function organisation(Request $request, string $ability): int
     {
         $ids = self::memberships($request->user())->pluck('organisation_id')->unique()->values();
-        $id = (int) $request->session()->get('organisation_id', $ids->count() === 1 ? $ids->first() : 0);
+        $id = self::selectedOrganisation($request);
         if (! $ids->contains($id) || ! $request->user()->hasPermission($ability, $id)) {
             self::audit($request, 'access.denied', $ids->contains($id) ? $id : null);
             abort(403, 'Select an authorised organisation and working context.');

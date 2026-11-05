@@ -1,0 +1,651 @@
+{
+  "demographics": [
+    {
+      "title": "Identity and preferences",
+      "fields": [
+        {
+          "key": "given_names",
+          "label": "Given names",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "family_name",
+          "label": "Family name",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "single_name_reason",
+          "label": "Single-name exception reason",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "preferred_name",
+          "label": "Preferred name",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "previous_names",
+          "label": "Previous names",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "dob_precision",
+          "label": "Date-of-birth precision",
+          "type": "select",
+          "choices": "exact,year_only,estimated,unknown",
+          "required": true
+        },
+        {
+          "key": "gender_identity",
+          "label": "Gender identity",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "pronouns",
+          "label": "Pronouns",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "preferred_language",
+          "label": "Preferred language",
+          "type": "select",
+          "choices": "en,fr,mfe",
+          "required": true
+        },
+        {
+          "key": "information_source",
+          "label": "Information source",
+          "type": "select",
+          "choices": "patient,family,professional,document,import",
+          "required": true
+        },
+        {
+          "key": "source_details",
+          "label": "Source / respondent and date",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "record_status",
+          "label": "Patient record status",
+          "type": "select",
+          "choices": "provisional,active,inactive,deceased",
+          "required": true
+        },
+        {
+          "key": "status_reason",
+          "label": "Status reason / date",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        }
+      ]
+    },
+    {
+      "title": "Safe contact",
+      "fields": [
+        {
+          "key": "safe_contact_method",
+          "label": "Safe contact method",
+          "type": "select",
+          "choices": "phone,email,app,representative,in_person",
+          "required": true
+        },
+        {
+          "key": "safe_contact_times",
+          "label": "Safe times / permission to leave messages",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "assisted_contact",
+          "label": "Assisted contact arrangement",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "communication_needs",
+          "label": "Communication / accessibility needs",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        }
+      ]
+    },
+    {
+      "title": "Address and visiting",
+      "fields": [
+        {
+          "key": "address_line_1",
+          "label": "Address line 1",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "address_line_2",
+          "label": "Address line 2",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "district",
+          "label": "District",
+          "type": "select",
+          "choices": "Port Louis,Pamplemousses,Riviere du Rempart,Flacq,Grand Port,Savanne,Plaines Wilhems,Moka,Black River,Rodrigues,Other",
+          "required": false
+        },
+        {
+          "key": "postal_code",
+          "label": "Postal code",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "country",
+          "label": "Country (ISO code)",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "home_latitude",
+          "label": "Home latitude",
+          "type": "number",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "home_longitude",
+          "label": "Home longitude",
+          "type": "number",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "pin_verification_evidence",
+          "label": "Patient-confirmed pin / date",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "access_instructions",
+          "label": "Access instructions (minimum necessary)",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "home_safety_precautions",
+          "label": "Home safety precautions",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        }
+      ]
+    },
+    {
+      "title": "Emergency contact and treating services",
+      "fields": [
+        {
+          "key": "emergency_contact_name",
+          "label": "Emergency contact name",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "emergency_contact_relationship",
+          "label": "Relationship",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "emergency_contact_phone",
+          "label": "Emergency contact phone (E.164)",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "emergency_contact_unavailable_reason",
+          "label": "Unavailable / declined reason",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "next_of_kin_name",
+          "label": "Next of kin name",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "next_of_kin_relationship",
+          "label": "Next of kin relationship",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "next_of_kin_phone",
+          "label": "Next of kin phone (E.164)",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "primary_doctor_name",
+          "label": "Primary doctor / clinic",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "primary_doctor_contact",
+          "label": "Primary doctor contact",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "primary_doctor_source",
+          "label": "Doctor contact source / last confirmed",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "preferred_pharmacy",
+          "label": "Preferred pharmacy",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "payer_relationship",
+          "label": "Payer relationship",
+          "type": "select",
+          "choices": "self,family,insurer,organisation,other",
+          "required": false
+        },
+        {
+          "key": "payer_details",
+          "label": "Billing contact / sharing limits",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        }
+      ]
+    }
+  ],
+  "clinical": [
+    {
+      "title": "Safety and clinical summary",
+      "fields": [
+        {
+          "key": "allergy_status",
+          "label": "Allergy status",
+          "type": "select",
+          "choices": "known_allergies,no_known_allergies,unknown,not_assessed",
+          "required": true
+        },
+        {
+          "key": "sex_for_clinical_use",
+          "label": "Sex relevant to care",
+          "type": "select",
+          "choices": "female,male,intersex,unknown,declined",
+          "required": false
+        },
+        {
+          "key": "blood_group",
+          "label": "Blood group",
+          "type": "select",
+          "choices": "A+,A-,B+,B-,AB+,AB-,O+,O-,unknown",
+          "required": false
+        },
+        {
+          "key": "blood_group_source",
+          "label": "Blood group source / verification",
+          "type": "text",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "past_medical_history",
+          "label": "Past medical history",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "functional_baseline",
+          "label": "Mobility, transfers, daily activities and aids",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "infection_precautions",
+          "label": "Infection precautions / review date",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        },
+        {
+          "key": "diet_and_swallowing",
+          "label": "Diet and swallowing needs",
+          "type": "textarea",
+          "choices": null,
+          "required": false
+        }
+      ]
+    }
+  ],
+  "children": {
+    "allergies": [
+      {
+        "key": "substance",
+        "label": "Substance",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "reaction",
+        "label": "Reaction",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "severity",
+        "label": "Severity",
+        "type": "select",
+        "choices": "mild,moderate,severe,unknown",
+        "required": true
+      },
+      {
+        "key": "onset",
+        "label": "Onset / precision",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "source",
+        "label": "Source",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "verification",
+        "label": "Verification / clinician",
+        "type": "text",
+        "choices": null,
+        "required": false
+      }
+    ],
+    "conditions": [
+      {
+        "key": "diagnosis",
+        "label": "Diagnosis / code",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "onset",
+        "label": "Onset / precision",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "select",
+        "choices": "active,resolved,unknown",
+        "required": true
+      },
+      {
+        "key": "source",
+        "label": "Source / confirming clinician",
+        "type": "text",
+        "choices": null,
+        "required": true
+      }
+    ],
+    "medications": [
+      {
+        "key": "medicine",
+        "label": "Medicine",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "dose",
+        "label": "Dose",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "route",
+        "label": "Route",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "frequency",
+        "label": "Frequency",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "indication",
+        "label": "Indication",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "status",
+        "label": "Status",
+        "type": "select",
+        "choices": "current,stopped,unknown",
+        "required": true
+      },
+      {
+        "key": "source",
+        "label": "Source",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "reconciliation",
+        "label": "Reconciliation evidence",
+        "type": "text",
+        "choices": null,
+        "required": false
+      }
+    ],
+    "surgeries": [
+      {
+        "key": "procedure",
+        "label": "Procedure",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "date",
+        "label": "Date / precision",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "institution",
+        "label": "Institution",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "outcome",
+        "label": "Outcome",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "source",
+        "label": "Source",
+        "type": "text",
+        "choices": null,
+        "required": true
+      }
+    ],
+    "immunisations": [
+      {
+        "key": "vaccine",
+        "label": "Vaccine",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "dose",
+        "label": "Dose",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "date",
+        "label": "Date / precision",
+        "type": "text",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "source",
+        "label": "Source / verification",
+        "type": "text",
+        "choices": null,
+        "required": true
+      }
+    ]
+  },
+  "demographicsChildren": {
+    "insurance_policies": [
+      {
+        "key": "insurer",
+        "label": "Insurer",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "policy_number",
+        "label": "Policy / member number",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "holder",
+        "label": "Policy holder",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "valid_from",
+        "label": "Valid from",
+        "type": "date",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "valid_until",
+        "label": "Valid until",
+        "type": "date",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "coverage_source",
+        "label": "Coverage source / confirmation",
+        "type": "text",
+        "choices": null,
+        "required": true
+      }
+    ],
+    "external_identifiers": [
+      {
+        "key": "country",
+        "label": "Issuing country (ISO code)",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "system",
+        "label": "Issuing system",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "value",
+        "label": "Identifier",
+        "type": "text",
+        "choices": null,
+        "required": true
+      },
+      {
+        "key": "valid_until",
+        "label": "Valid until",
+        "type": "date",
+        "choices": null,
+        "required": false
+      },
+      {
+        "key": "source",
+        "label": "Source",
+        "type": "text",
+        "choices": null,
+        "required": true
+      }
+    ]
+  }
+}

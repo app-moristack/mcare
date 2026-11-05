@@ -1,0 +1,275 @@
+{
+  "notes": {
+    "sections": [
+      {
+        "title": "Encounter and source",
+        "fields": [
+          {
+            "key": "encounter_at",
+            "label": "Actual encounter time (Mauritius)",
+            "type": "datetime-local",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "late_entry_reason",
+            "label": "Late-entry reason",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "subjective",
+            "label": "Patient / respondent report",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "unable_reason",
+            "label": "Reason subjective report could not be obtained",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          }
+        ]
+      },
+      {
+        "title": "Findings and care",
+        "fields": [
+          {
+            "key": "objective",
+            "label": "Objective findings, source and chart references",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "impression",
+            "label": "Role-appropriate assessment / impression",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "actions_response",
+            "label": "Actions, response and deviations",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "follow_up_needed",
+            "label": "Follow-up needed?",
+            "type": "select",
+            "choices": "yes,no",
+            "required": true
+          },
+          {
+            "key": "follow_up",
+            "label": "Next step / explicitly none needed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "follow_up_owner",
+            "label": "Responsible owner / contact",
+            "type": "text",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "follow_up_due",
+            "label": "Follow-up deadline (Mauritius)",
+            "type": "datetime-local",
+            "choices": null,
+            "required": false
+          }
+        ]
+      }
+    ],
+    "children": {}
+  },
+  "plans": {
+    "sections": [
+      {
+        "title": "Service and agreement",
+        "fields": [
+          {
+            "key": "service",
+            "label": "Planned service",
+            "type": "text",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "visits_per_week",
+            "label": "Planned visits per week",
+            "type": "number",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "session_minutes",
+            "label": "Planned session minutes",
+            "type": "number",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "duration_weeks",
+            "label": "Intended weeks",
+            "type": "number",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "patient_agreement",
+            "label": "Actual patient agreement",
+            "type": "select",
+            "choices": "agreed,partially_agreed,declined,capacity_route",
+            "required": true
+          },
+          {
+            "key": "agreement_evidence",
+            "label": "Agreement source, date and scope / partial concerns",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "capacity_evidence",
+            "label": "Capacity / verified representative basis",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "medication_order_refs",
+            "label": "Verified medication order references (no unsigned instructions)",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          }
+        ]
+      },
+      {
+        "title": "Precautions, contingencies and review",
+        "fields": [
+          {
+            "key": "risks_contingencies",
+            "label": "Risks, escalation signs, accountable owner and approved response route",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "equipment_training",
+            "label": "Equipment / training needs and task references",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "review_due",
+            "label": "Routine plan review due (Mauritius)",
+            "type": "datetime-local",
+            "choices": null,
+            "required": true
+          }
+        ]
+      }
+    ],
+    "children": {
+      "goals": [
+        {
+          "key": "description",
+          "label": "Patient-centred measurable goal",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "problem_source",
+          "label": "Problem reference / source",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "verification",
+          "label": "Clinical verification",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "baseline",
+          "label": "Baseline",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "target",
+          "label": "Target",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "unit",
+          "label": "Unit / measure",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "timeframe",
+          "label": "Timeframe",
+          "type": "text",
+          "choices": null,
+          "required": true
+        }
+      ],
+      "interventions": [
+        {
+          "key": "action",
+          "label": "Action",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "responsible_id",
+          "label": "Responsible assigned professional",
+          "type": "staff",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "discipline",
+          "label": "Responsible discipline",
+          "type": "select",
+          "choices": "doctor,nurse,physiotherapist,carer",
+          "required": true
+        },
+        {
+          "key": "frequency",
+          "label": "Frequency",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "precautions",
+          "label": "Precautions / explicitly none",
+          "type": "text",
+          "choices": null,
+          "required": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,746 @@
+{
+  "basic": {
+    "sections": [
+      {
+        "title": "Respondent and requested care",
+        "fields": [
+          {
+            "key": "respondent_relationship",
+            "label": "Actual respondent",
+            "type": "select",
+            "choices": "self,assisted",
+            "required": true
+          },
+          {
+            "key": "respondent_name",
+            "label": "Actual respondent name",
+            "type": "text",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "assistance_details",
+            "label": "Assistance provided / by whom",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "main_reason",
+            "label": "Main reason for care (patient words)",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "symptoms_reported",
+            "label": "Symptoms reported?",
+            "type": "select",
+            "choices": "yes,no,unknown",
+            "required": true
+          },
+          {
+            "key": "symptom_onset",
+            "label": "Symptom onset / explicitly unknown",
+            "type": "text",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "symptom_pattern",
+            "label": "Duration, pattern and change",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "pain_reported",
+            "label": "Pain reported?",
+            "type": "select",
+            "choices": "yes,no,unknown",
+            "required": true
+          },
+          {
+            "key": "pain_scoring",
+            "label": "Pain score status",
+            "type": "select",
+            "choices": "scored,unable,not_applicable",
+            "required": false
+          },
+          {
+            "key": "pain_score",
+            "label": "Pain score (0\u201310)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "pain_location",
+            "label": "Pain location / unable-to-score reason",
+            "type": "text",
+            "choices": null,
+            "required": false
+          }
+        ]
+      },
+      {
+        "title": "Reported history",
+        "fields": [
+          {
+            "key": "conditions_status",
+            "label": "Conditions history",
+            "type": "select",
+            "choices": "listed,none_reported,unknown",
+            "required": true
+          },
+          {
+            "key": "medicines_status",
+            "label": "Medicines history",
+            "type": "select",
+            "choices": "listed,none_reported,unknown",
+            "required": true
+          },
+          {
+            "key": "allergies_status",
+            "label": "Allergy history",
+            "type": "select",
+            "choices": "listed,no_known_allergies,unknown",
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Daily life and preferences",
+        "fields": [
+          {
+            "key": "mobility",
+            "label": "Mobility",
+            "type": "select",
+            "choices": "independent,aid,assistance,bedbound,not_assessed",
+            "required": true
+          },
+          {
+            "key": "daily_help",
+            "label": "Help needed (list activities or explicitly none / unknown)",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "recent_falls",
+            "label": "Recent falls",
+            "type": "select",
+            "choices": "yes,no,unknown",
+            "required": true
+          },
+          {
+            "key": "falls_details",
+            "label": "Falls dates / injuries or explicitly unknown",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "living_arrangements",
+            "label": "Living arrangements",
+            "type": "select",
+            "choices": "alone,family,facility,other,unknown",
+            "required": true
+          },
+          {
+            "key": "support",
+            "label": "Available support / explicitly unknown",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "goals",
+            "label": "Care goals and preferences",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "visit_windows",
+            "label": "Preferred visit times / access constraints",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          }
+        ]
+      }
+    ],
+    "children": {
+      "reported_conditions": [
+        {
+          "key": "condition",
+          "label": "Reported condition",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "source",
+          "label": "Source / uncertainty",
+          "type": "text",
+          "choices": null,
+          "required": true
+        }
+      ],
+      "reported_medicines": [
+        {
+          "key": "medicine",
+          "label": "Reported medicine",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "details",
+          "label": "Dose / use or explicitly unknown",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "source",
+          "label": "Source / uncertainty",
+          "type": "text",
+          "choices": null,
+          "required": true
+        }
+      ],
+      "reported_allergies": [
+        {
+          "key": "substance",
+          "label": "Substance",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "reaction",
+          "label": "Reaction / explicitly unknown",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "source",
+          "label": "Source / uncertainty",
+          "type": "text",
+          "choices": null,
+          "required": true
+        }
+      ]
+    }
+  },
+  "nursing": {
+    "sections": [
+      {
+        "title": "Visit, identity and agreement",
+        "fields": [
+          {
+            "key": "assessment_at",
+            "label": "Actual assessment time (Mauritius)",
+            "type": "datetime-local",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "location",
+            "label": "Actual assessment location",
+            "type": "text",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "late_entry_reason",
+            "label": "Late-entry reason (if recorded after assessment)",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "identifier_one_type",
+            "label": "First identifier",
+            "type": "select",
+            "choices": "legal_name,date_of_birth,patient_reference,verified_document",
+            "required": true
+          },
+          {
+            "key": "identifier_one_evidence",
+            "label": "First identifier check evidence",
+            "type": "text",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "identifier_two_type",
+            "label": "Second identifier",
+            "type": "select",
+            "choices": "legal_name,date_of_birth,patient_reference,verified_document",
+            "required": true
+          },
+          {
+            "key": "identifier_two_evidence",
+            "label": "Second identifier check evidence",
+            "type": "text",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "consent_reference",
+            "label": "Actual assessment agreement / evidence reference",
+            "type": "text",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "capacity_basis",
+            "label": "Capacity / representative basis and verification",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "presenting_history",
+            "label": "Presenting problem, chronology and patient priorities",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Observations",
+        "fields": [
+          {
+            "key": "observations_status",
+            "label": "Observations",
+            "type": "select",
+            "choices": "recorded,not_obtained",
+            "required": true
+          },
+          {
+            "key": "observations_reason",
+            "label": "Reason readings were not obtained",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "observed_at",
+            "label": "Readings taken at (Mauritius)",
+            "type": "datetime-local",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "temperature",
+            "label": "Temperature (\u00b0C)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "pulse",
+            "label": "Pulse (beats/min)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "respiratory_rate",
+            "label": "Respiratory rate (breaths/min)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "systolic",
+            "label": "Systolic BP (mmHg)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "diastolic",
+            "label": "Diastolic BP (mmHg)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "spo2",
+            "label": "SpO\u2082 (%)",
+            "type": "number",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "oxygen_device",
+            "label": "Oxygen / device and measurement context",
+            "type": "text",
+            "choices": null,
+            "required": false
+          }
+        ]
+      },
+      {
+        "title": "General appearance / orientation",
+        "fields": [
+          {
+            "key": "general_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "general_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Respiratory assessment",
+        "fields": [
+          {
+            "key": "respiratory_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "respiratory_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Cardiovascular assessment",
+        "fields": [
+          {
+            "key": "cardiovascular_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "cardiovascular_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Neurological assessment",
+        "fields": [
+          {
+            "key": "neurological_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "neurological_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Skin, wounds and pressure areas",
+        "fields": [
+          {
+            "key": "skin_wound_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "skin_wound_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Nutrition, hydration and swallowing",
+        "fields": [
+          {
+            "key": "nutrition_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "nutrition_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Elimination and catheter",
+        "fields": [
+          {
+            "key": "elimination_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "elimination_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Mobility, transfers and daily activities",
+        "fields": [
+          {
+            "key": "mobility_adl_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "mobility_adl_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Pain assessment: scale, score, location, character and response",
+        "fields": [
+          {
+            "key": "pain_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "pain_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Mental, social and safeguarding",
+        "fields": [
+          {
+            "key": "safeguarding_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "safeguarding_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Home environment and care safety",
+        "fields": [
+          {
+            "key": "environment_status",
+            "label": "Assessment status",
+            "type": "select",
+            "choices": "assessed,not_assessed",
+            "required": true
+          },
+          {
+            "key": "environment_findings",
+            "label": "Findings / support needs or reason not assessed",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      },
+      {
+        "title": "Reconciliation and risk review",
+        "fields": [
+          {
+            "key": "medication_reconciliation",
+            "label": "Medicine list reference, discrepancies, actions and responsible reviewer",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "pressure_risk_indicated",
+            "label": "Pressure injury risk review indicated?",
+            "type": "select",
+            "choices": "yes,no,unknown",
+            "required": true
+          },
+          {
+            "key": "pressure_risk_evidence",
+            "label": "Instrument/version and assessment reference, or rationale",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "falls_risk_indicated",
+            "label": "Falls risk review indicated?",
+            "type": "select",
+            "choices": "yes,no,unknown",
+            "required": true
+          },
+          {
+            "key": "falls_risk_evidence",
+            "label": "Instrument/version and assessment reference, or rationale",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "unresolved_concerns",
+            "label": "Unresolved concerns?",
+            "type": "select",
+            "choices": "yes,no",
+            "required": true
+          },
+          {
+            "key": "escalation_evidence",
+            "label": "Actual referral/escalation, responsible owner, acknowledgement and deadline",
+            "type": "textarea",
+            "choices": null,
+            "required": false
+          },
+          {
+            "key": "summary",
+            "label": "Summary recommendation and next step",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "review_due",
+            "label": "Assessment review due",
+            "type": "date",
+            "choices": null,
+            "required": true
+          },
+          {
+            "key": "comparison_review",
+            "label": "Comparison with basic assessment / discrepancies / follow-up",
+            "type": "textarea",
+            "choices": null,
+            "required": true
+          }
+        ]
+      }
+    ],
+    "children": {
+      "problems": [
+        {
+          "key": "problem",
+          "label": "Nursing problem",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "evidence",
+          "label": "Evidence",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "priority",
+          "label": "Priority",
+          "type": "select",
+          "choices": "routine,high,urgent",
+          "required": true
+        },
+        {
+          "key": "discipline",
+          "label": "Responsible discipline",
+          "type": "text",
+          "choices": null,
+          "required": true
+        }
+      ],
+      "interventions": [
+        {
+          "key": "goal",
+          "label": "Goal",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "action",
+          "label": "Action",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "frequency",
+          "label": "Frequency",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "equipment",
+          "label": "Equipment / explicitly none",
+          "type": "text",
+          "choices": null,
+          "required": true
+        },
+        {
+          "key": "review_date",
+          "label": "Review date",
+          "type": "date",
+          "choices": null,
+          "required": true
+        }
+      ]
+    }
+  }
+}

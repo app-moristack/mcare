@@ -7,6 +7,7 @@ use App\Services\Workspace;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
 use Inertia\Middleware;
 
 class HandleInertiaRequests extends Middleware
@@ -39,6 +40,7 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
+        Inertia::encryptHistory((bool) $request->user());
         [$message, $author] = str(Inspiring::quotes()->random())->explode('-');
 
         return array_merge(parent::share($request), [
@@ -51,7 +53,7 @@ class HandleInertiaRequests extends Middleware
                     return null;
                 }
                 $ids = Workspace::memberships($request->user())->pluck('organisation_id')->unique()->values();
-                $id = (int) $request->session()->get('organisation_id', $ids->count() === 1 ? $ids->first() : 0);
+                $id = Workspace::selectedOrganisation($request);
 
                 return ['organisation_id' => $ids->contains($id) ? $id : null,
                     'organisations' => Organisation::whereIn('id', $ids)->get(['id', 'name']),

@@ -14,6 +14,6 @@ class Patient extends Model
 
     protected function casts(): array
     {
-        return ['date_of_birth' => 'date:Y-m-d'];
+        return ['date_of_birth' => 'date:Y-m-d', 'demographics' => 'encrypted:array'];
     }
 }

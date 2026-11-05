@@ -1,4 +1,5 @@
 import GlassSidebarNavigation, { type NavigationLink, type NavigationSection } from '@/components/glass-sidebar-navigation';
+import GlobalSearch from '@/components/global-search';
 import { NavUser } from '@/components/nav-user';
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, useSidebar } from '@/components/ui/sidebar';
 import { useAppearance } from '@/hooks/use-appearance';
@@ -14,29 +15,14 @@ import {
     LayoutGrid,
     ListTodo,
     Moon,
-    Search,
     Settings,
     ShieldCheck,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
 function SidebarContents() {
     const { workspace, auth } = usePage<SharedData>().props;
     const { state, toggleSidebar, isMobile } = useSidebar();
     const { appearance, updateAppearance } = useAppearance();
-    const [search, setSearch] = useState('');
-    const searchRef = useRef<HTMLInputElement>(null);
     const dark = appearance === 'dark' || (appearance === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-    useEffect(() => {
-        const handler = (event: KeyboardEvent) => {
-            if (event.key.toLowerCase() === 'k' && (event.metaKey || event.ctrlKey)) {
-                event.preventDefault();
-                if (state === 'collapsed') toggleSidebar();
-                requestAnimationFrame(() => searchRef.current?.focus());
-            }
-        };
-        window.addEventListener('keydown', handler);
-        return () => window.removeEventListener('keydown', handler);
-    }, [state, toggleSidebar]);
     const allowed = (permission: string) => workspace?.permissions.includes(permission) ?? false;
     const main: NavigationLink[] = [
         { title: 'Dashboard', url: '/dashboard', icon: LayoutGrid },
@@ -79,7 +65,6 @@ function SidebarContents() {
                     type="button"
                     className="mcare-collapse"
                     onClick={() => {
-                        setSearch('');
                         toggleSidebar();
                     }}
                     aria-label={isMobile ? 'Close navigation' : state === 'expanded' ? 'Collapse navigation' : 'Expand navigation'}
@@ -87,21 +72,10 @@ function SidebarContents() {
                 >
                     <ChevronLeft />
                 </button>
-                <div className="mcare-search" inert={state === 'collapsed' && !isMobile}>
-                    <Search aria-hidden="true" />
-                    <input
-                        ref={searchRef}
-                        type="search"
-                        aria-label="Search navigation pages"
-                        placeholder="Search pages"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                    <kbd>Ctrl K</kbd>
-                </div>
+                <GlobalSearch />
             </SidebarHeader>
             <SidebarContent className="mcare-sidebar-content">
-                <GlassSidebarNavigation sections={sections} search={search} />
+                <GlassSidebarNavigation sections={sections} search="" />
             </SidebarContent>
             <SidebarFooter className="mcare-sidebar-footer">
                 <button

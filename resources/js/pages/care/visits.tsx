@@ -13,7 +13,7 @@ type Visit = {
     starts_at: string;
     ends_at: string;
     location: string;
-    patient: { name: string; reference: string };
+    patient: { id: number; name: string; reference: string };
     attendance: { kind: string; occurred_at: string }[];
 };
 export default function Visits({ visits }: { visits: { data: Visit[]; links: { url: string | null; label: string }[] } }) {
@@ -53,10 +53,19 @@ export default function Visits({ visits }: { visits: { data: Visit[]; links: { u
                 <div className="grid gap-5 lg:grid-cols-2">
                     {visits.data.map((v) => (
                         <section key={v.id} className="surface p-5">
-                            <div className="flex justify-between gap-4">
+                            <div className="flex flex-wrap justify-between gap-4">
                                 <div>
                                     <h2 className="text-lg font-semibold">{v.patient.name}</h2>
-                                    <p className="text-muted-foreground mt-1 text-xs">{v.patient.reference}</p>
+                                    <Link className="text-primary text-sm" href={`/patient-records/${v.patient.id}`}>
+                                        Open authorised record
+                                    </Link>
+                                    <Link className="text-primary ml-3 text-sm" href={`/patient-records/${v.patient.id}/clinical`}>
+                                        Notes and care plans
+                                    </Link>
+                                    <Link className="text-primary ml-3 text-sm" href={`/patient-records/${v.patient.id}/assessments`}>
+                                        Assessments
+                                    </Link>
+                                    <p className="text-muted-foreground mt-1 text-xs break-all">{v.patient.reference}</p>
                                 </div>
                                 <Badge variant="secondary">{v.status}</Badge>
                             </div>

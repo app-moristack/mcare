@@ -98,6 +98,9 @@ export default function CarePortal({
                                 <div key={p.id} className="mt-4 rounded-md border p-4">
                                     <p className="font-medium">{organisations.find((o) => o.id === p.organisation_id)?.name}</p>
                                     <p className="text-muted-foreground mt-2 font-mono text-xs break-all">{p.reference}</p>
+                                    <Button asChild variant="outline" className="mt-3 mr-2">
+                                        <Link href={`/my-care/patients/${p.id}`}>My record and access</Link>
+                                    </Button>
                                     <Badge variant="secondary" className="mt-3">
                                         {p.status}
                                     </Badge>

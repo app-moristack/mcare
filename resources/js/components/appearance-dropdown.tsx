@@ -1,11 +1,19 @@
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAppearance } from '@/hooks/use-appearance';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { useAppearance, useColorTheme } from '@/hooks/use-appearance';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { HTMLAttributes } from 'react';
 
 export default function AppearanceToggleDropdown({ className = '', ...props }: HTMLAttributes<HTMLDivElement>) {
     const { appearance, updateAppearance } = useAppearance();
+    const { colorTheme, updateColorTheme } = useColorTheme();
 
     const getCurrentIcon = () => {
         switch (appearance) {
@@ -28,6 +36,17 @@ export default function AppearanceToggleDropdown({ className = '', ...props }: H
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Colour theme</DropdownMenuLabel>
+                    <DropdownMenuItem onClick={() => updateColorTheme('warm')}>
+                        <span className="theme-swatch theme-swatch-warm" />
+                        Warm glass {colorTheme === 'warm' ? '✓' : ''}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => updateColorTheme('medical')}>
+                        <span className="theme-swatch theme-swatch-medical" />
+                        White &amp; blue {colorTheme === 'medical' ? '✓' : ''}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>Display mode</DropdownMenuLabel>
                     <DropdownMenuItem onClick={() => updateAppearance('light')}>
                         <span className="flex items-center gap-2">
                             <Sun className="h-5 w-5" />

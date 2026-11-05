@@ -53,8 +53,8 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
 
                 <Separator className="my-6 md:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="surface max-w-xl space-y-8 p-6">{children}</section>
+                <div className="min-w-0 flex-1 md:max-w-2xl">
+                    <section className="surface max-w-xl space-y-8 p-4 sm:p-6">{children}</section>
                 </div>
             </div>
         </div>

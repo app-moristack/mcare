@@ -66,6 +66,12 @@ class OperationsController extends Controller
         $query = null;
         if (isset(self::MODELS[$module])) {
             $query = self::MODELS[$module]::where('organisation_id', $org);
+            if ($r->filled('record')) {
+                $query->whereKey($r->integer('record'));
+            }
+            if ($module === 'patients') {
+                $query->select(['id', 'organisation_id', 'reference', 'name', 'date_of_birth', 'phone', 'email', 'locality', 'address', 'identity_status', 'status', 'authority_type', 'authority_evidence', 'version']);
+            }
             if ($status !== '') {
                 $query->where('status', $status);
             }
@@ -106,7 +112,7 @@ class OperationsController extends Controller
             'overdue_tasks' => CareTask::where('organisation_id', $org)->whereNotIn('status', ['completed', 'cancelled'])->where('due_at', '<', now())->count(),
         ] : null;
         $applications = $module === 'team' ? AccountApplication::where('organisation_id', $org)->with(['user:id,name,email,mfa_confirmed_at'])->latest()->paginate(15) : null;
-        $members = $module === 'team' ? DB::table('memberships')->join('users', 'users.id', '=', 'memberships.user_id')->where('organisation_id', $org)->select('memberships.*', 'users.name', 'users.email')->orderBy('users.name')->get() : [];
+        $members = $module === 'team' ? DB::table('memberships')->join('users', 'users.id', '=', 'memberships.user_id')->where('organisation_id', $org)->when($search !== '', fn ($q) => $q->where(fn ($b) => $b->where('users.name', 'like', '%'.$search.'%')->orWhere('users.email', 'like', '%'.$search.'%')))->select('memberships.*', 'users.name', 'users.email')->orderBy('users.name')->get() : [];
         $events = $module === 'audit' ? DB::table('audit_events')->leftJoin('users', 'users.id', '=', 'audit_events.actor_id')->where('audit_events.organisation_id', $org)->select('audit_events.*', 'users.name as actor_name')->orderByDesc('audit_events.id')->paginate(30) : null;
         Workspace::audit($r, 'operations.'.$module.'.viewed', $org);
 
@@ -143,7 +149,7 @@ class OperationsController extends Controller
     private function validateCreate(Request $r, string $module, int $org): array
     {
         if ($module === 'patients') {
-            $data = $r->validate(['name' => 'required|string|max:255', 'date_of_birth' => 'required|date_format:Y-m-d|before_or_equal:today', 'phone' => ['nullable', 'regex:/^\+[1-9][0-9]{7,14}$/'], 'email' => 'nullable|email|max:255', 'locality' => 'required|string|max:255', 'address' => 'nullable|string|max:2000', 'authority_type' => ['required', Rule::in(['patient_request', 'representative', 'referral_authority'])], 'authority_evidence' => 'required|string|max:2000']);
+            $data = $r->validate(['name' => 'required|string|max:255', 'date_of_birth' => 'nullable|date_format:Y-m-d|before_or_equal:today', 'phone' => ['nullable', 'regex:/^\+[1-9][0-9]{7,14}$/'], 'email' => 'nullable|email|max:255', 'locality' => 'required|string|max:255', 'address' => 'nullable|string|max:2000', 'authority_type' => ['required', Rule::in(['patient_request', 'representative', 'referral_authority'])], 'authority_evidence' => 'required|string|max:2000']);
 
             return [...$data, 'reference' => (string) Str::uuid()];
         }

@@ -65,6 +65,7 @@ class CarePortalController extends Controller
         $data = $r->validate(['organisation_id' => 'required|integer']);
         abort_unless(Workspace::memberships($r->user())->contains('organisation_id', (int) $data['organisation_id']), 403);
         $r->session()->put('organisation_id', (int) $data['organisation_id']);
+        Inertia::clearHistory();
         Workspace::audit($r, 'context.selected', (int) $data['organisation_id']);
 
         return to_route('dashboard');

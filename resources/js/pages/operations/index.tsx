@@ -50,7 +50,7 @@ type Field = { key: string; label: string; type?: string; choices?: string; opti
 const schemas: Record<string, Field[]> = {
     patients: [
         { key: 'name', label: 'Patient legal name' },
-        { key: 'date_of_birth', label: 'Date of birth', type: 'date' },
+        { key: 'date_of_birth', label: 'Date of birth (leave blank if unknown)', type: 'date', optional: true },
         { key: 'phone', label: 'Phone (E.164)', optional: true },
         { key: 'email', label: 'Email', type: 'email', optional: true },
         { key: 'locality', label: 'Town / locality' },
@@ -638,7 +638,11 @@ export default function Operations({
                                         </TableCell>
                                         <TableCell>
                                             {module === 'patients' ? (
-                                                String(row.date_of_birth).slice(0, 10)
+                                                row.date_of_birth ? (
+                                                    String(row.date_of_birth)
+                                                ) : (
+                                                    'Unknown'.slice(0, 10)
+                                                )
                                             ) : module === 'referrals' ? (
                                                 <>
                                                     {title(row.discipline ?? '')}
@@ -677,9 +681,14 @@ export default function Operations({
                                                     Details
                                                 </Button>
                                                 {module === 'patients' && (
-                                                    <Button variant="outline" size="sm" onClick={() => setEditingDetails(row)}>
-                                                        Edit details
-                                                    </Button>
+                                                    <>
+                                                        <Button asChild variant="outline" size="sm">
+                                                            <Link href={`/patient-records/${row.id}`}>Open record</Link>
+                                                        </Button>
+                                                        <Button variant="outline" size="sm" onClick={() => setEditingDetails(row)}>
+                                                            Edit details
+                                                        </Button>
+                                                    </>
                                                 )}
                                                 {(paths[module]?.[row.status]?.length ?? 0) > 0 && (
                                                     <Button variant="outline" size="sm" onClick={() => setEditing(row)}>

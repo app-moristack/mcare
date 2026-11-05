@@ -27,3 +27,13 @@ Final prompt:
 ## Sidebar refinement
 
 The user subsequently selected https://www.instagram.com/p/DfMH6YTTcwx/ (Glassy Sidebar V5) as the navigation-specific reference. The sidebar now opens expanded by default and remembers its collapsed state; a floating edge control uses a 440 ms eased width transition. A single measured highlight glides between pointer/focus targets with a 360 ms spring-like CSS easing curve, while the active route retains its indicator. The panel has a frosted top sheen and warm lower glow. Care operations expand/collapse using animated grid rows and inert hidden descendants. Navigation search is functional, supports Ctrl/Cmd+K and filters only already-authorised page links. The bottom night-mode switch uses the existing saved appearance setting. Existing mobile navigation and reduced-motion support are retained. No reference branding, artificial counters or new business permissions were imported.
+
+## Two selectable palettes
+
+The theme menu in the shared header and Appearance settings now offer Warm glass and White & blue. The second palette uses #1e628a in light mode and the user-supplied blue/white examination-room image, encoded without visual changes to `resources/images/care-clinic-blue.webp` (about 90 KB). Source: `C:/Users/i.rujbally/Downloads/Salle d’examen médicale bleue et blanche.png`. Both assets are bundled locally by Vite. No image-generation tool was used for this supplied image.
+
+The palette is saved under `mcare-color-theme` in this browser. Selecting White & blue initially selects light display mode; the existing night-mode control remains available. Header, settings and sidebar brightness controls share a synchronised store. A small initial head script applies the saved palette before paint, including authentication pages. The warm palette remains the default for existing installations.
+
+White/blue tokens and glass material overrides cover text, buttons, inputs, selects, tables, status badges, dialogs, navigation sheen/highlight, auth cards and metrics. Sidebar motion and reduced-motion handling are shared by both palettes. Layout constraints keep long forms and dialogs within small screens; wide tables scroll locally.
+
+Responsive verification: workspace overview, patients, referrals, appointments, tasks, invoices, team, audit, dashboard, care portal, visits, profile, appearance and patient record were checked at 320px with no document horizontal overflow. Patient forms were inspected at 390px; theme settings at 768px and 1280px. Wide data tables retain local horizontal scrolling.

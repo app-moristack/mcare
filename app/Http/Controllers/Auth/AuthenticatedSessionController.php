@@ -33,6 +33,7 @@ class AuthenticatedSessionController extends Controller
         $request->authenticate();
 
         $request->session()->regenerate();
+        Inertia::clearHistory();
         $request->user()->forceFill(['last_login_at' => now()])->save();
         DB::table('audit_events')->insert(['actor_id' => $request->user()->id, 'event' => 'session.created', 'created_at' => now()]);
 
@@ -48,6 +49,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+        Inertia::clearHistory();
 
         return redirect('/');
     }
