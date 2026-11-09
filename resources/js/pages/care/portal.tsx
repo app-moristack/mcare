@@ -3,7 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { SharedData } from '@/types';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 export default function CarePortal({
     organisations,
     patients,
@@ -26,6 +27,7 @@ export default function CarePortal({
         items: { id: number; description: string; quantity: number; total_minor: number }[];
     }[];
 }) {
+    const { flash } = usePage<SharedData>().props;
     const form = useForm<{ organisation_id: string; authority_acceptance: boolean }>({ organisation_id: '', authority_acceptance: false });
     const money = (n: number) => new Intl.NumberFormat('en-MU', { style: 'currency', currency: 'MUR' }).format(n / 100);
     return (
@@ -52,7 +54,10 @@ export default function CarePortal({
                             className="mt-5 space-y-4"
                             onSubmit={(e) => {
                                 e.preventDefault();
-                                form.post('/my-care/request');
+                                form.post('/my-care/request', {
+                                    preserveScroll: true,
+                                    onSuccess: () => form.reset(),
+                                });
                             }}
                         >
                             <Label htmlFor="care-organisation">Care organisation</Label>
@@ -88,6 +93,14 @@ export default function CarePortal({
                                     {error}
                                 </p>
                             ))}
+                            {flash?.success && (
+                                <p
+                                    role="status"
+                                    className="rounded-xl border border-green-300 bg-green-50 p-3 text-sm font-medium text-green-950 dark:border-green-800 dark:bg-green-950 dark:text-green-100"
+                                >
+                                    {flash.success}
+                                </p>
+                            )}
                             <Button disabled={form.processing}>Send care request</Button>
                         </form>
                     </section>

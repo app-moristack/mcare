@@ -36,7 +36,7 @@ class CarePortalController extends Controller
             Workspace::audit($r, 'patient.care_requested', $data['organisation_id'], 'patients', $patient->id);
         });
 
-        return back()->with('success', 'Your care request is available to the selected organisation’s coordination team.');
+        return redirect('/my-care')->with('success', 'Your care request is available to the selected organisation’s coordination team.');
     }
 
     public function application(Request $r)

@@ -194,8 +194,11 @@ class OperationsTest extends TestCase
         $user->patientProfile()->create(['public_id' => (string) Str::uuid(), 'legal_name' => 'My Synthetic Name', 'date_of_birth' => '1980-01-01', 'locality' => 'Test', 'onboarding_completed_at' => now()]);
         $this->actingAs($user)->get('/my-care')->assertInertia(fn (Assert $p) => $p->component('care/portal', false)->has('patients', 0));
         $this->post('/my-care/request', ['organisation_id' => $this->org->id, 'authority_acceptance' => false])->assertSessionHasErrors('authority_acceptance');
-        $this->post('/my-care/request', ['organisation_id' => $this->org->id, 'authority_acceptance' => true])->assertRedirect()->assertSessionHasNoErrors();
-        $this->post('/my-care/request', ['organisation_id' => $this->org->id, 'authority_acceptance' => true])->assertRedirect()->assertSessionHasNoErrors();
+        $message = 'Your care request is available to the selected organisation’s coordination team.';
+        $this->post('/my-care/request', ['organisation_id' => $this->org->id, 'authority_acceptance' => true])
+            ->assertRedirect('/my-care')->assertSessionHasNoErrors()->assertSessionHas('success', $message);
+        $this->followingRedirects()->post('/my-care/request', ['organisation_id' => $this->org->id, 'authority_acceptance' => true])
+            ->assertOk()->assertInertia(fn (Assert $page) => $page->component('care/portal', false)->where('flash.success', $message));
         $this->assertDatabaseCount('patients', 2);
         $this->assertDatabaseHas('patients', ['user_id' => $user->id, 'name' => 'My Synthetic Name']);
     }
