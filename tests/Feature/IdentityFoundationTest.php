@@ -110,6 +110,23 @@ class IdentityFoundationTest extends TestCase
         $this->assertNull($user->patientProfile->fresh()->onboarding_completed_at);
     }
 
+    public function test_mauritius_phone_format_is_normalised_when_onboarding_is_completed(): void
+    {
+        $user = User::factory()->create(['email_verified_at' => now(), 'account_kind' => 'self_patient']);
+        $user->patientProfile()->create(['public_id' => (string) Str::uuid()]);
+
+        $this->actingAs($user)->patch('/onboarding', [
+            'legal_name' => 'Synthetic Patient',
+            'date_of_birth' => '1990-05-20',
+            'mobile_phone' => '5712 3456',
+            'locality' => 'Moka',
+        ])->assertRedirect('/dashboard');
+
+        $profile = $user->patientProfile->fresh();
+        $this->assertSame('+23057123456', $profile->mobile_phone);
+        $this->assertNotNull($profile->onboarding_completed_at);
+    }
+
     public function test_suspended_account_is_denied_during_an_existing_session(): void
     {
         $user = User::factory()->create(['account_status' => 'suspended']);

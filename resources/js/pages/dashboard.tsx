@@ -17,7 +17,7 @@ export default function Dashboard({
     const { auth } = usePage<SharedData>().props;
     const verified = !!auth.user.email_verified_at;
     const complete = !!patientProfile?.onboarding_completed_at;
-    const tasks = [verified, complete, false];
+    const tasks = [verified, complete];
     return (
         <AppLayout breadcrumbs={[{ title: 'Overview', href: '/dashboard' }]}>
             <Head title="Your overview" />
@@ -108,15 +108,19 @@ export default function Dashboard({
                         <div className="bg-primary rounded-lg p-7 text-white">
                             <span className="text-primary-foreground/80 text-xs tracking-widest uppercase">Getting started</span>
                             <h2 className="mt-4 text-2xl font-medium">A few steps to make it yours</h2>
-                            <p className="text-primary-foreground/80 mt-3 text-sm">{tasks.filter(Boolean).length} of 3 steps complete</p>
+                            <p className="text-primary-foreground/80 mt-3 text-sm">
+                                {tasks.filter(Boolean).length} of 2 account setup steps complete
+                            </p>
                             <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/15">
-                                <div className="h-full rounded-full bg-blue-300" style={{ width: `${(tasks.filter(Boolean).length / 3) * 100}%` }} />
+                                <div
+                                    className="h-full rounded-full bg-blue-300"
+                                    style={{ width: `${(tasks.filter(Boolean).length / tasks.length) * 100}%` }}
+                                />
                             </div>
                             <div className="mt-7 space-y-5">
                                 {[
                                     ['Verify your email', verified],
                                     ['Complete your basic details', complete],
-                                    ['Identity review — not yet available', false],
                                 ].map(([label, done]) => (
                                     <div key={String(label)} className="flex items-center gap-3 text-sm">
                                         {done ? (
@@ -128,6 +132,9 @@ export default function Dashboard({
                                     </div>
                                 ))}
                             </div>
+                            <p className="text-primary-foreground/75 mt-6 text-xs">
+                                Clinical identity review is separate and begins only when required for a care or professional workflow.
+                            </p>
                             <Link
                                 href={verified ? '/onboarding' : '/verify-email'}
                                 className="text-primary-foreground mt-8 inline-flex items-center gap-6 rounded-lg bg-white px-5 py-3 text-sm font-semibold"

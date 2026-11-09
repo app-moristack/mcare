@@ -25,6 +25,7 @@ RUN sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf \
     && composer dump-autoload --no-dev --optimize \
     && mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs \
     && ln -s /var/www/html/storage/app/public public/storage \
+    && find app bootstrap config database public resources routes -type d -exec chmod 755 {} + \
     && chown -R www-data:www-data storage bootstrap/cache /var/run/apache2 /var/lock/apache2 \
     && chmod +x /usr/local/bin/mcare-entrypoint
 USER www-data

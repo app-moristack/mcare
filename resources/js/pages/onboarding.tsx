@@ -42,7 +42,7 @@ export default function Onboarding({ profile }: { profile: Profile }) {
                         [
                             ['legal_name', 'Legal name', 'text'],
                             ['date_of_birth', 'Date of birth', 'date'],
-                            ['mobile_phone', 'Mobile phone (optional, e.g. +23051234567)', 'tel'],
+                            ['mobile_phone', 'Mobile phone (optional, e.g. 57123456 or +23057123456)', 'tel'],
                             ['locality', 'Town / locality', 'text'],
                         ] as const
                     ).map(([key, label, type]) => (
@@ -55,6 +55,9 @@ export default function Onboarding({ profile }: { profile: Profile }) {
                                 onChange={(e) => setData(key, e.target.value)}
                                 required={key !== 'mobile_phone'}
                                 disabled={processing}
+                                autoComplete={
+                                    key === 'legal_name' ? 'name' : key === 'mobile_phone' ? 'tel' : key === 'locality' ? 'address-level2' : 'bday'
+                                }
                             />
                             <InputError message={errors[key]} />
                         </div>

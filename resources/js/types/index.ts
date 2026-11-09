@@ -29,7 +29,7 @@ export interface SharedData {
         mfa_enrolled: boolean;
         notifications: { id: number; message: string; url: string }[];
     } | null;
-    flash: { success?: string };
+    flash: { success?: string; error?: string };
     name: string;
     quote: { message: string; author: string };
     auth: Auth;
