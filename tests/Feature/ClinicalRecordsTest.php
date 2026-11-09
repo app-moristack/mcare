@@ -250,8 +250,9 @@ class ClinicalRecordsTest extends TestCase
     public function test_credential_date_expiry_uses_the_mauritius_day_boundary(): void
     {
         $a = $this->noteDraft();
-        $this->travelTo(CarbonImmutable::parse('2026-11-05T21:00:00Z'));
-        $this->nurse->application()->update(['credential_expires_at' => '2026-11-05']);
+        $mauritiusNow = CarbonImmutable::now(config('mauricare.time_zone'));
+        $this->nurse->application()->update(['credential_expires_at' => $mauritiusNow->toDateString()]);
+        $this->travelTo($mauritiusNow->addDay()->startOfDay()->utc());
         $this->patchJson($this->base().'/notes/'.$a->id, ['version' => 1, 'action' => 'save', 'content' => ['subjective' => 'Denied after local midnight']])->assertForbidden();
         $this->travelBack();
     }
