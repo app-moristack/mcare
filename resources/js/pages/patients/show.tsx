@@ -27,6 +27,7 @@ export default function PatientRecord({
     manage,
     canRead,
     canWrite,
+    canReadObservations,
     rules,
     staff,
     history,
@@ -36,6 +37,7 @@ export default function PatientRecord({
     manage: boolean;
     canRead: boolean;
     canWrite: boolean;
+    canReadObservations: boolean;
     rules: AccessRule[];
     staff: { id: number; name: string }[];
     history: History;
@@ -91,12 +93,19 @@ export default function PatientRecord({
                         Emergency contacts and payers receive no clinical access by relationship alone. Dates and times use Mauritius time.
                     </p>
                 </header>
-                <Button asChild variant="outline">
-                    <Link href={`/patient-records/${p.id}/assessments`}>Assessments and completion</Link>
-                </Button>
-                <Button asChild variant="outline">
-                    <Link href={`/patient-records/${p.id}/clinical`}>Notes and care plans</Link>
-                </Button>
+                <div className="flex flex-wrap gap-2">
+                    <Button asChild variant="outline">
+                        <Link href={`/patient-records/${p.id}/assessments`}>Assessments and completion</Link>
+                    </Button>
+                    {canReadObservations && (
+                        <Button asChild variant="outline">
+                            <Link href={`/patient-records/${p.id}/observations`}>Observations and vital chart</Link>
+                        </Button>
+                    )}
+                    <Button asChild variant="outline">
+                        <Link href={`/patient-records/${p.id}/clinical`}>Notes and care plans</Link>
+                    </Button>
+                </div>
                 <nav aria-label="Patient sections" className="flex flex-wrap gap-2">
                     {['details', 'clinical', 'access', 'history']
                         .filter((t) => manage || !['access', 'history'].includes(t))

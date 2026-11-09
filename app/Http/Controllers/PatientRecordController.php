@@ -80,7 +80,7 @@ class PatientRecordController extends Controller
 
         return Inertia::render('patients/show', [
             'patient' => [...$p->only(['id', 'name', 'reference', 'date_of_birth', 'phone', 'email', 'locality', 'address', 'status', 'version', 'identity_status']), 'demographics' => $manage ? $p->demographics : collect($p->demographics ?? [])->except(['insurance_policies', 'external_identifiers', 'payer_relationship', 'payer_details'])->all()],
-            'schema' => config('patient'), 'manage' => $manage, 'canRead' => PatientAccess::allowed($r->user(), $p, 'summary.read'), 'canWrite' => PatientAccess::allowed($r->user(), $p, 'summary.write'),
+            'schema' => config('patient'), 'manage' => $manage, 'canRead' => PatientAccess::allowed($r->user(), $p, 'summary.read'), 'canWrite' => PatientAccess::allowed($r->user(), $p, 'summary.write'), 'canReadObservations' => PatientAccess::allowed($r->user(), $p, 'observations.read'),
             'rules' => $manage ? $this->rules($p) : [],
             'staff' => $manage ? Workspace::staff($p->organisation_id)->select('id', 'name')->orderBy('name')->get() : [],
             'history' => $manage ? $this->history($p) : [],

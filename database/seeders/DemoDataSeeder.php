@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Models\Appointment;
 use App\Models\CareTask;
+use App\Models\ClinicalObservation;
 use App\Models\Invoice;
 use App\Models\Organisation;
 use App\Models\Patient;
@@ -102,9 +103,9 @@ class DemoDataSeeder extends Seeder
                     $u = $users[$key];
                     $rule = ['patient_id' => $p->id, 'user_id' => $u->id, 'scope' => 'all', 'kind' => 'assignment', 'role' => $role, 'purpose' => 'Synthetic demo care', 'authority_type' => 'care_assignment', 'evidence' => 'Synthetic named assignment; not real care authority.', 'wording_version' => 'DEMO-v1', 'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(), 'recorded_by' => $admin->id];
                     PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('assignment-'.$i.'-'.$key)], $rule);
-                    $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read'];
+                    $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read', 'observations.read'];
                     if ($key === 'nurse') {
-                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write']);
+                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write']);
                     }if ($key === 'lead') {
                         $scopes[] = 'nursing.cosign';
                     }
@@ -143,6 +144,54 @@ class DemoDataSeeder extends Seeder
             }
             foreach (PatientAssessment::whereIn('patient_id', collect($patients)->pluck('id'))->whereIn('content_hash', [hash('sha256', 'synthetic-basic-example'), hash('sha256', 'synthetic-nursing-signed'), hash('sha256', 'synthetic-nursing-awaiting_cosign')])->get() as $assessment) {
                 $assessment->update(['content_hash' => $assessment->digest($assessment->content)]);
+            }
+            $observation = ClinicalObservation::firstOrCreate(['request_id' => $this->uuid('observation-original')], [
+                'patient_id' => $patients[0]->id,
+                'appointment_id' => $past->id,
+                'author_id' => $users['nurse']->id,
+                'observed_at' => $past->starts_at->copy()->addMinutes(10),
+                'measurements' => [
+                    ['type' => 'temperature', 'value' => '36.8', 'unit' => '°C', 'method' => 'Synthetic demo device context; not a real measurement.'],
+                    ['type' => 'pulse', 'value' => '72', 'unit' => 'beats/min', 'method' => 'Synthetic demonstration only.'],
+                ],
+                'context' => 'SYNTHETIC observation set. Never use for care decisions.',
+                'content_hash' => str_repeat('0', 64),
+            ]);
+            if ($observation->content_hash === str_repeat('0', 64)) {
+                $observation->update(['content_hash' => $observation->digest()]);
+            }
+            $correction = ClinicalObservation::firstOrCreate(['request_id' => $this->uuid('observation-correction')], [
+                'patient_id' => $patients[0]->id,
+                'appointment_id' => $past->id,
+                'author_id' => $users['nurse']->id,
+                'supersedes_id' => $observation->id,
+                'observed_at' => $past->starts_at->copy()->addMinutes(10),
+                'measurements' => [
+                    ['type' => 'temperature', 'value' => '36.7', 'unit' => '°C', 'method' => 'Synthetic corrected demo value; not a real measurement.'],
+                    ['type' => 'pulse', 'value' => '72', 'unit' => 'beats/min', 'method' => 'Synthetic demonstration only.'],
+                ],
+                'context' => 'SYNTHETIC corrected observation set. Never use for care decisions.',
+                'correction_reason' => 'Synthetic demonstration of an append-only transcription correction.',
+                'content_hash' => str_repeat('0', 64),
+            ]);
+            if ($correction->content_hash === str_repeat('0', 64)) {
+                $correction->update(['content_hash' => $correction->digest()]);
+            }
+            $followUp = ClinicalObservation::firstOrCreate(['request_id' => $this->uuid('observation-follow-up')], [
+                'patient_id' => $patients[0]->id,
+                'appointment_id' => $past->id,
+                'author_id' => $users['nurse']->id,
+                'observed_at' => $past->starts_at->copy()->addMinutes(35),
+                'measurements' => [
+                    ['type' => 'temperature', 'value' => '36.9', 'unit' => '°C', 'method' => 'Synthetic demo device context; not a real measurement.'],
+                    ['type' => 'pulse', 'value' => '74', 'unit' => 'beats/min', 'method' => 'Synthetic demonstration only.'],
+                    ['type' => 'oxygen_saturation', 'value' => '98', 'unit' => '%', 'method' => 'Synthetic demonstration only.'],
+                ],
+                'context' => 'SYNTHETIC follow-up observation set for trend display. Never use for care decisions.',
+                'content_hash' => str_repeat('0', 64),
+            ]);
+            if ($followUp->content_hash === str_repeat('0', 64)) {
+                $followUp->update(['content_hash' => $followUp->digest()]);
             }
             $this->call(ClinicalRecordDemoSeeder::class);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);

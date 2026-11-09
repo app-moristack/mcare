@@ -60,7 +60,7 @@ class AssessmentAndSearchTest extends TestCase
 
     public function test_demo_seeder_is_idempotent_and_covers_every_delivered_module(): void
     {
-        $tables = ['users', 'organisations', 'memberships', 'patients', 'patient_profiles', 'account_applications', 'referrals', 'appointments', 'attendance_events', 'care_tasks', 'invoices', 'invoice_items', 'payments', 'patient_access_rules', 'patient_summaries', 'patient_summary_revisions', 'patient_assessments', 'operation_notifications', 'clinical_notes', 'care_episodes', 'care_plans', 'care_plan_events', 'clinical_publications'];
+        $tables = ['users', 'organisations', 'memberships', 'patients', 'patient_profiles', 'account_applications', 'referrals', 'appointments', 'attendance_events', 'care_tasks', 'invoices', 'invoice_items', 'payments', 'patient_access_rules', 'patient_summaries', 'patient_summary_revisions', 'patient_assessments', 'clinical_observations', 'operation_notifications', 'clinical_notes', 'care_episodes', 'care_plans', 'care_plan_events', 'clinical_publications'];
         $counts = [];
         foreach ($tables as $t) {
             $counts[$t] = DB::table($t)->count();

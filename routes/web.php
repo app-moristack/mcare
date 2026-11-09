@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\CarePortalController;
+use App\Http\Controllers\ClinicalObservationController;
 use App\Http\Controllers\ClinicalRecordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
@@ -52,6 +53,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/patient-records/{id}/assessments', [AssessmentController::class, 'store']);
         Route::patch('/patient-records/{id}/assessments/{assessment}', [AssessmentController::class, 'update']);
         Route::post('/patient-records/{id}/assessments/{assessment}/cosign', [AssessmentController::class, 'cosign']);
+        Route::get('/patient-records/{id}/observations', [ClinicalObservationController::class, 'index'])->whereNumber('id');
+        Route::post('/patient-records/{id}/observations', [ClinicalObservationController::class, 'store'])->whereNumber('id');
         Route::get('/patient-records/{id}', [PatientRecordController::class, 'show']);
         Route::patch('/patient-records/{id}', [PatientRecordController::class, 'update']);
         Route::get('/patient-records/{id}/summary', [PatientRecordController::class, 'summary']);

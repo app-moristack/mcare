@@ -11,7 +11,7 @@ const fields: Field[] = [
         label: 'Scope',
         type: 'select',
         choices:
-            'all,summary.read,summary.write,basic.read,basic.write,nursing.read,nursing.write,nursing.cosign,notes.read,notes.write,notes.publish,plans.read,plans.write,plans.approve,plans.publish',
+            'all,summary.read,summary.write,basic.read,basic.write,nursing.read,nursing.write,nursing.cosign,observations.read,observations.write,notes.read,notes.write,notes.publish,plans.read,plans.write,plans.approve,plans.publish',
         required: true,
     },
     {
@@ -170,6 +170,8 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
                                         'nursing.read',
                                         'nursing.write',
                                         'nursing.cosign',
+                                        'observations.read',
+                                        'observations.write',
                                         'notes.read',
                                         'notes.write',
                                         'notes.publish',
