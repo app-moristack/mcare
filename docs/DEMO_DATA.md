@@ -17,9 +17,9 @@ All addresses use the reserved `example.test` domain. Password for newly created
 | Email | Role / useful journey |
 | --- | --- |
 | demo.patient@example.test | My care, own clinical summary, basic assessment submission/amendment, access controls |
-| demo.nurse@example.test | Assigned visits, summary reconciliation, assisted basic intake, private nursing drafts and signing |
+| demo.nurse@example.test | Assigned visits, summary/medication reconciliation, medication administration, private nursing drafts and signing |
 | demo.lead@example.test | Clinical oversight, comparison view, separate nursing co-signature |
-| demo.doctor@example.test | Assigned basic/nursing read access |
+| demo.doctor@example.test | Assigned clinical read access and external medication-instruction verification |
 | demo.physio@example.test | Assigned summary read only; no nursing/basic assessment access |
 | demo.carer@example.test | Workforce account; no general clinical record browsing |
 | demo.coordinator@example.test | Patients/referrals/tasks/appointments and assessment completion only |
@@ -29,7 +29,7 @@ All addresses use the reserved `example.test` domain. Password for newly created
 
 ## Coverage
 
-Six synthetic patients, one linked patient account/profile, approved and pending applications, memberships, assignments and category grants, clinical summaries with encrypted retained revisions, referrals, future/confirmed and completed visits, immutable arrival/departure examples without real GPS, overdue/waiting tasks, draft/issued/part-paid/paid invoices with line items and synthetic reconciled payments, a coordination notification, audit seed event, submitted basic assessment and amendment draft, signed nursing example, pending co-signature and nursing draft, and encrypted structured observation sets including an append-only correction and effective trend values.
+Six synthetic patients, one linked patient account/profile, approved and pending applications, memberships, assignments and category grants, clinical summaries with encrypted retained revisions, referrals, future/confirmed and completed visits, immutable arrival/departure examples without real GPS, overdue/waiting tasks, draft/issued/part-paid/paid invoices with line items and synthetic reconciled payments, a coordination notification, audit seed event, submitted basic assessment and amendment draft, signed nursing example, pending co-signature and nursing draft, encrypted structured observation sets including an append-only correction and effective trend values, and an encrypted medication reconciliation, fake verified external instruction and explicitly omitted administration outcome.
 
 All evidence and clinical text explicitly identify themselves as synthetic. Demo credentials and assessment signatures are examples only and do not represent actual clinicians, patient consent or clinical verification. No fabricated data should be used for care decisions. Uploaded files, prescribing, result integrations and other unimplemented modules are not represented as working.
 

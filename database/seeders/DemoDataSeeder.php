@@ -6,6 +6,9 @@ use App\Models\Appointment;
 use App\Models\CareTask;
 use App\Models\ClinicalObservation;
 use App\Models\Invoice;
+use App\Models\MedicationAdministration;
+use App\Models\MedicationInstruction;
+use App\Models\MedicationReconciliation;
 use App\Models\Organisation;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
@@ -103,9 +106,11 @@ class DemoDataSeeder extends Seeder
                     $u = $users[$key];
                     $rule = ['patient_id' => $p->id, 'user_id' => $u->id, 'scope' => 'all', 'kind' => 'assignment', 'role' => $role, 'purpose' => 'Synthetic demo care', 'authority_type' => 'care_assignment', 'evidence' => 'Synthetic named assignment; not real care authority.', 'wording_version' => 'DEMO-v1', 'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(), 'recorded_by' => $admin->id];
                     PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('assignment-'.$i.'-'.$key)], $rule);
-                    $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read', 'observations.read'];
+                    $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read', 'observations.read', 'medications.read', 'medications.reconcile'];
                     if ($key === 'nurse') {
-                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write']);
+                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write', 'medications.administer']);
+                    } elseif ($key === 'doctor') {
+                        $scopes[] = 'medications.verify';
                     }if ($key === 'lead') {
                         $scopes[] = 'nursing.cosign';
                     }
@@ -193,6 +198,56 @@ class DemoDataSeeder extends Seeder
             if ($followUp->content_hash === str_repeat('0', 64)) {
                 $followUp->update(['content_hash' => $followUp->digest()]);
             }
+            $reconciliationAttributes = [
+                'patient_id' => $patients[0]->id,
+                'appointment_id' => $past->id,
+                'author_id' => $users['nurse']->id,
+                'supersedes_id' => null,
+                'reconciled_at' => $past->starts_at->copy()->addMinutes(5),
+                'status' => 'complete',
+                'sources' => ['SYNTHETIC patient interview', 'SYNTHETIC labelled container review'],
+                'medicines' => [['name' => 'DEMO medicine — not for clinical use', 'dose' => 'DEMO dose', 'route' => 'oral', 'frequency' => 'DEMO frequency', 'status' => 'taking']],
+                'discrepancies' => 'Synthetic demonstration only; no real discrepancy.',
+                'follow_up' => null,
+                'correction_reason' => null,
+            ];
+            MedicationReconciliation::firstOrCreate(['request_id' => $this->uuid('medication-reconciliation')], [...$reconciliationAttributes, 'content_hash' => MedicationReconciliation::digestFor($reconciliationAttributes)]);
+            $instructionAttributes = [
+                'patient_id' => $patients[0]->id,
+                'verifier_id' => $users['doctor']->id,
+                'supersedes_id' => null,
+                'verified_at' => $past->starts_at->copy()->subHour(),
+                'starts_at' => $past->starts_at->copy()->subDay(),
+                'ends_at' => now()->addMonth(),
+                'status' => 'active',
+                'details' => [
+                    'medicine' => 'DEMO medicine — not for clinical use',
+                    'dose' => 'DEMO dose',
+                    'route' => 'oral',
+                    'frequency' => 'DEMO frequency',
+                    'instructions' => 'SYNTHETIC instruction. Never administer.',
+                    'prescriber_name' => 'Demo External Prescriber',
+                    'prescriber_registration' => 'DEMO-NOT-A-REGISTRATION',
+                    'source_reference' => 'DEMO-NOT-A-PRESCRIPTION',
+                    'verification_evidence' => 'Synthetic external source verification for workflow demonstration only.',
+                ],
+                'correction_reason' => null,
+            ];
+            $instruction = MedicationInstruction::firstOrCreate(['request_id' => $this->uuid('medication-instruction')], [...$instructionAttributes, 'content_hash' => MedicationInstruction::digestFor($instructionAttributes)]);
+            $administrationAttributes = [
+                'patient_id' => $patients[0]->id,
+                'medication_instruction_id' => $instruction->id,
+                'appointment_id' => $past->id,
+                'administrator_id' => $users['nurse']->id,
+                'supersedes_id' => null,
+                'administered_at' => $past->starts_at->copy()->addMinutes(20),
+                'outcome' => 'omitted',
+                'instruction_snapshot' => ['instruction_id' => $instruction->id, 'instruction_hash' => $instruction->content_hash, ...$instruction->details],
+                'reason' => 'SYNTHETIC record: no medicine was administered.',
+                'notes' => 'Synthetic demonstration only.',
+                'correction_reason' => null,
+            ];
+            MedicationAdministration::firstOrCreate(['request_id' => $this->uuid('medication-administration')], [...$administrationAttributes, 'content_hash' => MedicationAdministration::digestFor($administrationAttributes)]);
             $this->call(ClinicalRecordDemoSeeder::class);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {

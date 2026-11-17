@@ -46,6 +46,14 @@ Source: MauriCare Complete Application Specification v1.0, 2 November 2026. Docu
 - The seeded administrator now defaults to its sole owner organisation when no context is selected, so adding the optional demo workspace does not hide admin menus. Explicit selections and tenant boundaries remain enforced.
 - SBAR handover/acknowledgement, carer-specific observation templates, supervised-note co-sign policy, plan rejection/withdrawal workflows, patient goal logs and formal records-access review remain pending. Existing nursing assessment co-signing remains separate.
 
+## Medication safety increment
+
+- Dedicated encrypted, password-signed medication reconciliation records bind the reported list and its information sources to an encounter. Complete, incomplete and unable states are explicit; incomplete work requires accountable follow-up. Corrections append a linked replacement and retain the original.
+- Doctors with a current credential, named doctor assignment and explicit `medications.verify` grant can transcribe and verify an authoritative external medication instruction, including external prescriber registration, source reference and verification evidence. This is explicitly not electronic prescribing and grants no prescribing authority.
+- Nurses with an eligible assigned visit and explicit `medications.administer` grant can record administered, withheld, refused or omitted outcomes. Non-administration requires a reason. Each immutable record retains an encrypted snapshot and hash of the effective verified instruction; future, expired, discontinued or superseded instructions are rejected.
+- Read, reconcile, verify and administer scopes are independent and rechecked inside patient row locks. Tenant isolation, patient blocks, current assignments/credentials, password proof, idempotent request IDs, append-only corrections and attributable audit events are covered by workflow tests.
+- The responsive workspace uses mobile card layouts, wrapping long clinical/source text, shared glass surfaces and theme-compatible controls. It provides no dose advice, interaction checking, inferred thresholds, alerts or automated clinical decisions.
+
 ## Access model
 
 The browser uses Laravel session authentication and CSRF protection. Every workspace request rechecks active/approved/time-valid organisation membership and a registered ability. Working organisation is selected explicitly when an account belongs to several organisations. Cross-organisation IDs are rejected server-side. Approved operational roles grant only their configured abilities; a doctor/nurse role does not grant a service-wide patient directory or financial administration.
@@ -63,7 +71,7 @@ Tests cover role escalation, tenant isolation, MFA configuration/enrolment/repla
 ## Still required for the clinical P0 pilot
 
 - Extend the clinical-summary assignment/grant/block engine to each future category (assessments, notes, results, files and exports), add verified delegated proxy workflows and push access-history notifications. No broad family chart access exists.
-- Approved assessment questionnaires/risk instruments, medication administration/prescribing, investigations and result ownership/follow-up. The reconciled history summary and structured observation chart do not replace these workflows.
+- Approved assessment questionnaires/risk instruments, prescribing with explicitly approved authority, and investigations with result ownership/follow-up. Medication verification does not create a prescription, and the structured observation chart does not replace an approved instrument.
 - Private scanned/quarantined files and credential vault, safe downloads/exports and passport contents. Credential references currently require off-app verification; no file uploads are accepted.
 - Full provider availability/leave/travel roster, acceptance workflow, attendance exception review/corrections, missed-visit welfare check/replacement, episode closure and signed clinical discharge.
 - Approved SOP/checklist version snapshots, quality/incidents, approved emergency directory and staffed escalation routes.
@@ -76,10 +84,10 @@ Tests cover role escalation, tenant isolation, MFA configuration/enrolment/repla
 
 Use synthetic data until the PDF's pilot acceptance scenarios, clinical/privacy approvals and operational staffing are completed. This operational increment does not claim healthcare compliance, complete P0 acceptance or production readiness.
 
-## Development progress estimate (5 November 2026)
+## Development progress estimate (17 November 2026)
 
-Estimated **40% of the full specification**, and approximately **50% of the core clinical P0 feature scope**. These are engineering scope estimates, not counts of pages/screens, acceptance completion, clinical approval or production readiness. Operational foundations, identity, access controls, patient records and assessment workflows have substantial coverage; many cross-cutting clinical and service workflows are still absent or partial.
+Estimated **43% of the full specification**, and approximately **55% of the core clinical P0 feature scope**. These are engineering scope estimates, not counts of pages/screens, acceptance completion, clinical approval or production readiness. Operational foundations, identity, access controls, patient records, assessments, signed records, observations and medication safety workflows have substantial coverage; many cross-cutting clinical and service workflows are still absent or partial.
 
-Largest remaining packages: approved risk instruments; medicine administration/reconciliation/prescribing; investigations and accountable critical-result follow-up; private uploads/vault/export; full roster/replacement/discharge workflows; SOPs/quality/emergency staffing; quotes/refunds/claims/payouts; secure recovery/proxy workflows; approved questionnaires, accessibility/languages, production scheduler/monitoring and backup/restore acceptance. Later-phase video, partner integrations, devices and validated AI also remain.
+Largest remaining packages: approved risk instruments and prescribing authority; investigations and accountable critical-result follow-up; private uploads/vault/export; full roster/replacement/discharge workflows; SOPs/quality/emergency staffing; quotes/refunds/claims/payouts; secure recovery/proxy workflows; approved questionnaires, accessibility/languages, production scheduler/monitoring and backup/restore acceptance. Later-phase video, partner integrations, devices and validated AI also remain.
 
-The next development priority after this increment is the medication reconciliation/administration workflow. Clinical instruments, thresholds and prescribing authority must be explicitly approved rather than inferred from generic forms.
+The next development priority is the investigations and accountable result-follow-up workflow. Approved instrument content, thresholds and prescribing authority remain blocked on explicit clinical approval rather than being inferred from generic forms.

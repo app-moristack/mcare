@@ -6,6 +6,7 @@ use App\Http\Controllers\ClinicalObservationController;
 use App\Http\Controllers\ClinicalRecordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GlobalSearchController;
+use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\MfaController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\OperationsController;
@@ -55,6 +56,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/patient-records/{id}/assessments/{assessment}/cosign', [AssessmentController::class, 'cosign']);
         Route::get('/patient-records/{id}/observations', [ClinicalObservationController::class, 'index'])->whereNumber('id');
         Route::post('/patient-records/{id}/observations', [ClinicalObservationController::class, 'store'])->whereNumber('id');
+        Route::get('/patient-records/{id}/medications', [MedicationController::class, 'index'])->whereNumber('id');
+        Route::post('/patient-records/{id}/medications/reconciliations', [MedicationController::class, 'reconcile'])->whereNumber('id');
+        Route::post('/patient-records/{id}/medications/instructions', [MedicationController::class, 'verify'])->whereNumber('id');
+        Route::post('/patient-records/{id}/medications/administrations', [MedicationController::class, 'administer'])->whereNumber('id');
         Route::get('/patient-records/{id}', [PatientRecordController::class, 'show']);
         Route::patch('/patient-records/{id}', [PatientRecordController::class, 'update']);
         Route::get('/patient-records/{id}/summary', [PatientRecordController::class, 'summary']);

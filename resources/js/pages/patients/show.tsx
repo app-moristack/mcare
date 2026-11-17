@@ -28,6 +28,7 @@ export default function PatientRecord({
     canRead,
     canWrite,
     canReadObservations,
+    canReadMedications,
     rules,
     staff,
     history,
@@ -38,6 +39,7 @@ export default function PatientRecord({
     canRead: boolean;
     canWrite: boolean;
     canReadObservations: boolean;
+    canReadMedications: boolean;
     rules: AccessRule[];
     staff: { id: number; name: string }[];
     history: History;
@@ -100,6 +102,11 @@ export default function PatientRecord({
                     {canReadObservations && (
                         <Button asChild variant="outline">
                             <Link href={`/patient-records/${p.id}/observations`}>Observations and vital chart</Link>
+                        </Button>
+                    )}
+                    {canReadMedications && (
+                        <Button asChild variant="outline">
+                            <Link href={`/patient-records/${p.id}/medications`}>Medication safety</Link>
                         </Button>
                     )}
                     <Button asChild variant="outline">

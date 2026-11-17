@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class PatientAccess
 {
-    public const SCOPES = ['summary.read', 'summary.write', 'basic.read', 'basic.write', 'nursing.read', 'nursing.write', 'nursing.cosign', 'observations.read', 'observations.write', 'notes.read', 'notes.write', 'notes.publish', 'plans.read', 'plans.write', 'plans.approve', 'plans.publish'];
+    public const SCOPES = ['summary.read', 'summary.write', 'basic.read', 'basic.write', 'nursing.read', 'nursing.write', 'nursing.cosign', 'observations.read', 'observations.write', 'medications.read', 'medications.reconcile', 'medications.verify', 'medications.administer', 'notes.read', 'notes.write', 'notes.publish', 'plans.read', 'plans.write', 'plans.approve', 'plans.publish'];
 
     public static function current(Patient $p, int $user)
     {
@@ -27,7 +27,7 @@ class PatientAccess
         }
         $roles = Workspace::memberships($u)->where('organisation_id', $p->organisation_id)->pluck('role');
         $allowedRoles = match (true) {
-            $action === 'notes.publish' || $action === 'plans.approve' || $action === 'plans.publish' => ['clinical_admin'], $action === 'nursing.write' => ['nurse'], $action === 'nursing.cosign' => ['clinical_admin'], str_starts_with($action, 'nursing.') || str_starts_with($action, 'basic.') || str_starts_with($action, 'observations.') => ['doctor', 'nurse', 'clinical_admin'], default => ['doctor', 'nurse', 'physiotherapist', 'clinical_admin']
+            $action === 'notes.publish' || $action === 'plans.approve' || $action === 'plans.publish' => ['clinical_admin'], $action === 'nursing.write' || $action === 'medications.administer' => ['nurse'], $action === 'medications.verify' => ['doctor'], $action === 'nursing.cosign' => ['clinical_admin'], str_starts_with($action, 'nursing.') || str_starts_with($action, 'basic.') || str_starts_with($action, 'observations.') || str_starts_with($action, 'medications.') => ['doctor', 'nurse', 'clinical_admin'], default => ['doctor', 'nurse', 'physiotherapist', 'clinical_admin']
         };
         $assignments = $rules->where('kind', 'assignment')->whereIn('role', $allowedRoles)->filter(fn ($a) => $roles->contains($a->role));
         if ($assignments->isEmpty()) {
