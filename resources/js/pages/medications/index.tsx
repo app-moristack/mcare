@@ -145,7 +145,7 @@ export default function Medications({
         supersedes_id: '',
         correction_reason: '',
         password: '',
-        declaration: false,
+        declaration: false as boolean,
     });
     const instruction = useForm({
         request_id: crypto.randomUUID(),
@@ -165,7 +165,7 @@ export default function Medications({
         supersedes_id: '',
         correction_reason: '',
         password: '',
-        declaration: false,
+        declaration: false as boolean,
     });
     const administration = useForm({
         request_id: crypto.randomUUID(),
@@ -178,7 +178,7 @@ export default function Medications({
         supersedes_id: '',
         correction_reason: '',
         password: '',
-        declaration: false,
+        declaration: false as boolean,
     });
     const reconciliationErrors = reconciliation.errors as Record<string, string | undefined>;
     const submitReconciliation = (event: FormEvent) => {
@@ -320,7 +320,7 @@ export default function Medications({
                                         placeholder="Patient interview&#10;Dispensing label reviewed"
                                         required
                                     />
-                                    <InputError message={reconciliation.errors.sources} />
+                                    <InputError message={reconciliationErrors.sources} />
                                 </div>
                                 <fieldset className="space-y-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">

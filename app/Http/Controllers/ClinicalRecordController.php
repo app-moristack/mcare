@@ -8,6 +8,8 @@ use App\Models\CarePlan;
 use App\Models\CareTask;
 use App\Models\ClinicalNote;
 use App\Models\ClinicalPublication;
+use App\Models\InvestigationPublication;
+use App\Models\InvestigationResult;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\Referral;
@@ -402,7 +404,9 @@ class ClinicalRecordController extends Controller
     public function own(Request $r, int $id)
     {
         $p = Patient::where('user_id', $r->user()->id)->findOrFail($id);
-        $items = ClinicalPublication::where('patient_id', $id)->with(['note:id,original_id,status', 'plan:id,status,episode_id,revision_number'])->latest('published_at')->get()->map(fn ($v) => ['id' => $v->id, 'kind' => $v->clinical_note_id ? 'notes' : 'plans', 'record_id' => $v->clinical_note_id ?? $v->care_plan_id, 'original_id' => $v->note?->original_id, 'status' => $v->clinical_note_id ? 'signed' : $v->plan?->status, 'revision_number' => $v->plan?->revision_number, 'content' => $v->content, 'published_at' => $v->published_at]);
+        $items = ClinicalPublication::where('patient_id', $id)->with(['note:id,original_id,status', 'plan:id,status,episode_id,revision_number'])->latest('published_at')->get()->map(fn ($v) => ['id' => 'clinical-'.$v->id, 'kind' => $v->clinical_note_id ? 'notes' : 'plans', 'record_id' => $v->clinical_note_id ?? $v->care_plan_id, 'original_id' => $v->note?->original_id, 'status' => $v->clinical_note_id ? 'signed' : $v->plan?->status, 'revision_number' => $v->plan?->revision_number, 'content' => $v->content, 'published_at' => $v->published_at]);
+        $resultItems = InvestigationPublication::where('patient_id', $id)->whereNotIn('investigation_result_id', InvestigationResult::whereNotNull('supersedes_id')->pluck('supersedes_id'))->with('result.investigation')->get()->map(fn ($v) => ['id' => 'result-'.$v->id, 'kind' => 'results', 'record_id' => $v->investigation_result_id, 'original_id' => null, 'status' => $v->result?->status, 'revision_number' => null, 'result_name' => $v->result?->investigation?->details['name'], 'content' => $v->content, 'published_at' => $v->published_at]);
+        $items = $items->concat($resultItems)->sortByDesc('published_at')->values();
         Workspace::audit($r, 'clinical.patient_publications.viewed', $p->organisation_id, 'patients', $id);
 
         return Inertia::render('clinical/portal', ['patient' => $p->only(['id', 'name', 'reference']), 'items' => $items]);

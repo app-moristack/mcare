@@ -83,7 +83,7 @@ class ClinicalRecordsTest extends TestCase
     public function test_operational_status_and_published_portal_never_contain_private_records(): void
     {
         $this->staff($this->admin)->get($this->base())->assertOk()->assertInertia(fn (Assert $p) => $p->component('clinical/index', false)->where('permissions.notes.read', false)->where('rows', fn ($rows) => collect($rows)->every(fn ($row) => ! array_key_exists('content', $row))));
-        $this->actingAs($this->patientUser)->get('/my-care/patients/'.$this->patient->id.'/clinical')->assertOk()->assertInertia(fn (Assert $p) => $p->component('clinical/portal', false)->has('items', 3));
+        $this->actingAs($this->patientUser)->get('/my-care/patients/'.$this->patient->id.'/clinical')->assertOk()->assertInertia(fn (Assert $p) => $p->component('clinical/portal', false)->has('items', 4));
         $response = $this->get('/my-care/patients/'.$this->patient->id.'/clinical');
         $this->assertStringNotContainsString('SYNTHETIC PRIVATE', $response->getContent());
         $this->assertStringNotContainsString('content_hash', $response->getContent());

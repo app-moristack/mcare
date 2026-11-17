@@ -5,6 +5,9 @@ namespace Database\Seeders;
 use App\Models\Appointment;
 use App\Models\CareTask;
 use App\Models\ClinicalObservation;
+use App\Models\Investigation;
+use App\Models\InvestigationPublication;
+use App\Models\InvestigationResult;
 use App\Models\Invoice;
 use App\Models\MedicationAdministration;
 use App\Models\MedicationInstruction;
@@ -106,13 +109,13 @@ class DemoDataSeeder extends Seeder
                     $u = $users[$key];
                     $rule = ['patient_id' => $p->id, 'user_id' => $u->id, 'scope' => 'all', 'kind' => 'assignment', 'role' => $role, 'purpose' => 'Synthetic demo care', 'authority_type' => 'care_assignment', 'evidence' => 'Synthetic named assignment; not real care authority.', 'wording_version' => 'DEMO-v1', 'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(), 'recorded_by' => $admin->id];
                     PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('assignment-'.$i.'-'.$key)], $rule);
-                    $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read', 'observations.read', 'medications.read', 'medications.reconcile'];
+                    $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read', 'observations.read', 'medications.read', 'medications.reconcile', 'investigations.read', 'results.read'];
                     if ($key === 'nurse') {
-                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write', 'medications.administer']);
+                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write', 'medications.administer', 'results.receive']);
                     } elseif ($key === 'doctor') {
-                        $scopes[] = 'medications.verify';
+                        $scopes = array_merge($scopes, ['medications.verify', 'investigations.request', 'results.acknowledge']);
                     }if ($key === 'lead') {
-                        $scopes[] = 'nursing.cosign';
+                        $scopes = array_merge($scopes, ['nursing.cosign', 'results.receive', 'results.publish']);
                     }
                     foreach ($scopes as $scope) {
                         PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('grant-'.$i.'-'.$key.'-'.$scope)], [...$rule, 'kind' => 'grant', 'scope' => $scope, 'role' => null, 'authority_type' => 'patient_consent', 'evidence' => 'Synthetic demo authority for '.$scope.'; no real patient data.']);
@@ -248,6 +251,33 @@ class DemoDataSeeder extends Seeder
                 'correction_reason' => null,
             ];
             MedicationAdministration::firstOrCreate(['request_id' => $this->uuid('medication-administration')], [...$administrationAttributes, 'content_hash' => MedicationAdministration::digestFor($administrationAttributes)]);
+            $investigationAttributes = [
+                'patient_id' => $patients[0]->id,
+                'requester_id' => $users['doctor']->id,
+                'requested_at' => $past->starts_at->copy()->subHours(3),
+                'category' => 'laboratory',
+                'details' => ['name' => 'DEMO investigation — not a real order', 'clinical_question' => 'Synthetic demonstration question only.', 'destination' => 'Demo External Laboratory', 'source_reference' => 'DEMO-NOT-AN-ORDER'],
+            ];
+            $investigation = Investigation::firstOrCreate(['request_id' => $this->uuid('investigation-request')], [...$investigationAttributes, 'content_hash' => Investigation::digestFor($investigationAttributes)]);
+            $resultAttributes = [
+                'patient_id' => $patients[0]->id,
+                'investigation_id' => $investigation->id,
+                'received_by' => $users['nurse']->id,
+                'owner_id' => $users['doctor']->id,
+                'backup_id' => $users['coordinator']->id,
+                'supersedes_id' => null,
+                'received_at' => $past->starts_at->copy()->subHour(),
+                'source_reported_at' => $past->starts_at->copy()->subHours(2),
+                'source_flag' => 'routine',
+                'details' => ['result_type' => 'final', 'source_reference' => 'DEMO-NOT-A-RESULT', 'summary' => 'SYNTHETIC result summary. Never use for care decisions.', 'source_comment' => 'Synthetic demonstration only.', 'values' => [['label' => 'DEMO value', 'value' => 'NOT A REAL VALUE', 'unit' => 'demo']], 'escalated_at' => null, 'escalation_channel' => null, 'escalation_evidence' => null],
+                'correction_reason' => null,
+            ];
+            $result = InvestigationResult::firstOrCreate(['request_id' => $this->uuid('investigation-result')], [...$resultAttributes, 'status' => 'acknowledged', 'acknowledgement' => ['review_summary' => 'Synthetic owner review only.', 'patient_communication' => 'pending', 'communication_evidence' => 'Synthetic demonstration: no real patient contact.', 'follow_up_required' => 'yes', 'follow_up_plan' => 'Synthetic follow-up only.', 'follow_up_due' => now()->addWeek()->toISOString()], 'acknowledged_by' => $users['doctor']->id, 'acknowledged_at' => now()->subMinutes(30), 'content_hash' => InvestigationResult::digestFor($resultAttributes)]);
+            $resultTask = CareTask::firstOrCreate(['organisation_id' => $org->id, 'request_id' => $this->uuid('investigation-result-task')], ['patient_id' => $patients[0]->id, 'title' => 'Follow up synthetic investigation result #'.$result->id, 'description' => 'Synthetic tracking only; no clinical result content is included.', 'priority' => 'routine', 'status' => 'waiting', 'owner_id' => $users['doctor']->id, 'backup_id' => $users['coordinator']->id, 'created_by' => $users['nurse']->id, 'due_at' => now()->addWeek(), 'waiting_reason' => 'Synthetic accountable follow-up demonstration.', 'next_check_at' => now()->addWeek()]);
+            if (! $result->task_id) {
+                $result->update(['task_id' => $resultTask->id]);
+            }
+            InvestigationPublication::firstOrCreate(['request_id' => $this->uuid('investigation-publication')], ['patient_id' => $patients[0]->id, 'investigation_result_id' => $result->id, 'content' => ['summary' => 'Reviewed synthetic result summary for portal demonstration only.', 'next_steps' => 'Synthetic next step: contact the demo care team.'], 'source_hash' => $result->content_hash, 'published_by' => $users['lead']->id, 'published_at' => now()->subMinutes(20)]);
             $this->call(ClinicalRecordDemoSeeder::class);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {

@@ -54,6 +54,15 @@ Source: MauriCare Complete Application Specification v1.0, 2 November 2026. Docu
 - Read, reconcile, verify and administer scopes are independent and rechecked inside patient row locks. Tenant isolation, patient blocks, current assignments/credentials, password proof, idempotent request IDs, append-only corrections and attributable audit events are covered by workflow tests.
 - The responsive workspace uses mobile card layouts, wrapping long clinical/source text, shared glass surfaces and theme-compatible controls. It provides no dose advice, interaction checking, inferred thresholds, alerts or automated clinical decisions.
 
+## Investigation and accountable-result increment
+
+- Doctors with a current credential, named doctor assignment and explicit `investigations.request` authority can sign a retained record of an external investigation request. The app does not transmit an order or claim a laboratory/imaging integration.
+- Authorised clinicians can transcribe an externally supplied preliminary, final or corrected result, its source reference, optional source values and the source's own routine/urgent/critical flag. Content is encrypted, password-signed, hashed and append-only; corrected results retain and supersede the original without rewriting it.
+- Every result is assigned to a current authorised doctor owner, a distinct operational backup and a due task. The owner alone records acknowledgement, patient-communication evidence, follow-up plan/deadline and completion evidence. Immediate in-app notifications contain no result narrative. Tasks are tracking aids, not emergency delivery channels.
+- No result flag or threshold is inferred. A source-flagged critical result is rejected unless the clinician records that real-world escalation already occurred, with actual time, channel and evidence. The app labels the resulting task as tracking-only and does not claim to dispatch an emergency escalation.
+- A clinical lead may publish a separately written, password-confirmed plain-language summary and next steps only after current-result acknowledgement. The portal never receives raw source values, private review content, hashes or superseded-result publications.
+- Dedicated investigation/result scopes, current assignment/credential checks, blocks, tenant isolation, row locks, idempotent request IDs, immutable source hashes, lifecycle version checks and audit events are covered by synthetic workflow tests.
+
 ## Access model
 
 The browser uses Laravel session authentication and CSRF protection. Every workspace request rechecks active/approved/time-valid organisation membership and a registered ability. Working organisation is selected explicitly when an account belongs to several organisations. Cross-organisation IDs are rejected server-side. Approved operational roles grant only their configured abilities; a doctor/nurse role does not grant a service-wide patient directory or financial administration.
@@ -70,8 +79,9 @@ Tests cover role escalation, tenant isolation, MFA configuration/enrolment/repla
 
 ## Still required for the clinical P0 pilot
 
-- Extend the clinical-summary assignment/grant/block engine to each future category (assessments, notes, results, files and exports), add verified delegated proxy workflows and push access-history notifications. No broad family chart access exists.
-- Approved assessment questionnaires/risk instruments, prescribing with explicitly approved authority, and investigations with result ownership/follow-up. Medication verification does not create a prescription, and the structured observation chart does not replace an approved instrument.
+- Extend the assignment/grant/block engine to future files and exports, add verified delegated proxy workflows and push access-history notifications. No broad family chart access exists.
+- Approved assessment questionnaires/risk instruments and prescribing with explicitly approved authority. Medication verification does not create a prescription, and the structured observation chart does not replace an approved instrument.
+- Validated external laboratory/imaging adapters, authenticated source ingestion and an approved staffed critical-result escalation service. Current investigation requests/results are manually evidenced records and follow-up tracking, not external transmissions.
 - Private scanned/quarantined files and credential vault, safe downloads/exports and passport contents. Credential references currently require off-app verification; no file uploads are accepted.
 - Full provider availability/leave/travel roster, acceptance workflow, attendance exception review/corrections, missed-visit welfare check/replacement, episode closure and signed clinical discharge.
 - Approved SOP/checklist version snapshots, quality/incidents, approved emergency directory and staffed escalation routes.
@@ -86,8 +96,8 @@ Use synthetic data until the PDF's pilot acceptance scenarios, clinical/privacy 
 
 ## Development progress estimate (17 November 2026)
 
-Estimated **43% of the full specification**, and approximately **55% of the core clinical P0 feature scope**. These are engineering scope estimates, not counts of pages/screens, acceptance completion, clinical approval or production readiness. Operational foundations, identity, access controls, patient records, assessments, signed records, observations and medication safety workflows have substantial coverage; many cross-cutting clinical and service workflows are still absent or partial.
+Estimated **46% of the full specification**, and approximately **60% of the core clinical P0 feature scope**. These are engineering scope estimates, not counts of pages/screens, acceptance completion, clinical approval or production readiness. Operational foundations, identity, access controls, patient records, assessments, signed records, observations, medication safety and accountable result workflows have substantial coverage; many cross-cutting clinical and service workflows are still absent or partial.
 
-Largest remaining packages: approved risk instruments and prescribing authority; investigations and accountable critical-result follow-up; private uploads/vault/export; full roster/replacement/discharge workflows; SOPs/quality/emergency staffing; quotes/refunds/claims/payouts; secure recovery/proxy workflows; approved questionnaires, accessibility/languages, production scheduler/monitoring and backup/restore acceptance. Later-phase video, partner integrations, devices and validated AI also remain.
+Largest remaining packages: approved risk instruments and prescribing authority; private uploads/vault/export; full roster/replacement/discharge workflows; SOPs/quality/emergency staffing; quotes/refunds/claims/payouts; secure recovery/proxy workflows; approved questionnaires, accessibility/languages, external result adapters, production scheduler/monitoring and backup/restore acceptance. Later-phase video, partner integrations, devices and validated AI also remain.
 
-The next development priority is the investigations and accountable result-follow-up workflow. Approved instrument content, thresholds and prescribing authority remain blocked on explicit clinical approval rather than being inferred from generic forms.
+The next development priority is the private document vault with quarantine metadata, category-scoped safe downloads and reviewed export controls. Approved instrument content, thresholds and prescribing authority remain blocked on explicit clinical approval rather than being inferred from generic forms.

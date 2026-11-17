@@ -9,13 +9,14 @@ export default function PublishedCare({
 }: {
     patient: { id: number; name: string; reference: string };
     items: {
-        id: number;
+        id: string;
         kind: string;
         record_id: number;
         original_id: number | null;
         revision_number: number | null;
         status: string;
-        content: { summary: string; shared_goals?: string };
+        result_name?: string;
+        content: { summary: string; shared_goals?: string; next_steps?: string };
         published_at: string;
     }[];
 }) {
@@ -46,11 +47,15 @@ export default function PublishedCare({
                 {items.map((v) => (
                     <article key={v.id} className="surface space-y-4 p-4 sm:p-6">
                         <div className="flex flex-wrap items-start justify-between gap-3">
-                            <h2 className="font-semibold">
-                                {v.kind === 'notes'
-                                    ? `${v.original_id ? 'Addendum' : 'Visit summary'} #${v.record_id}`
-                                    : `Care plan · Version ${v.revision_number}`}
-                            </h2>
+                            {v.kind === 'results' ? (
+                                <h2 className="font-semibold">Investigation result · {v.result_name}</h2>
+                            ) : (
+                                <h2 className="font-semibold">
+                                    {v.kind === 'notes'
+                                        ? `${v.original_id ? 'Addendum' : 'Visit summary'} #${v.record_id}`
+                                        : `Care plan · Version ${v.revision_number}`}
+                                </h2>
+                            )}
                             <Badge variant={v.status === 'active' ? 'success' : 'secondary'}>{title(v.status)}</Badge>
                         </div>
                         {v.original_id && <p className="text-sm">Correction / addition to record #{v.original_id}</p>}
@@ -66,6 +71,12 @@ export default function PublishedCare({
                             <div className="space-y-2">
                                 <h3 className="font-medium">Shared goals</h3>
                                 <p className="text-sm break-words whitespace-pre-wrap">{v.content.shared_goals}</p>
+                            </div>
+                        )}
+                        {v.content.next_steps && (
+                            <div className="space-y-2">
+                                <h3 className="font-medium">Next steps</h3>
+                                <p className="text-sm break-words whitespace-pre-wrap">{v.content.next_steps}</p>
                             </div>
                         )}
                     </article>
