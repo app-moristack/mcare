@@ -7,6 +7,7 @@ use App\Models\CareTask;
 use App\Models\Invoice;
 use App\Models\Organisation;
 use App\Models\Patient;
+use App\Models\ProviderRosterEntry;
 use App\Models\Referral;
 use App\Models\User;
 use Database\Seeders\AdminUserSeeder;
@@ -111,6 +112,7 @@ class OperationsTest extends TestCase
     {
         $p = $this->patient();
         $ref = $this->referral($p);
+        ProviderRosterEntry::create(['organisation_id' => $this->org->id, 'provider_id' => $this->admin->id, 'kind' => 'availability', 'starts_at' => '2029-01-01', 'ends_at' => '2031-01-01', 'status' => 'approved', 'recorded_by' => $this->admin->id, 'reviewed_by' => $this->backup->id, 'reviewed_at' => now(), 'request_id' => (string) Str::uuid()]);
         $data = ['request_id' => (string) Str::uuid(), 'patient_id' => $p->id, 'referral_id' => $ref->id, 'provider_id' => $this->admin->id, 'service' => 'Synthetic assessment', 'starts_at' => '2030-01-01T10:00', 'ends_at' => '2030-01-01T11:00', 'location_type' => 'home', 'location' => 'Synthetic address'];
         $this->post('/workspace/appointments', $data)->assertRedirect()->assertSessionHasNoErrors();
         $visit = Appointment::first();
@@ -120,14 +122,16 @@ class OperationsTest extends TestCase
         $this->assertDatabaseCount('appointments', 1);
         $event = ['request_id' => (string) Str::uuid(), 'kind' => 'departure', 'capture_status' => 'denied', 'exception_reason' => 'Location permission denied in test'];
         $this->post('/my-visits/'.$visit->id.'/attendance', $event)->assertSessionHasErrors('kind');
-        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 1, 'status' => 'confirmed', 'confirmation_evidence' => 'Synthetic patient and provider confirmed by coordinator'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 1, 'status' => 'confirmed', 'confirmation_evidence' => 'Synthetic patient confirmation'])->assertSessionHasErrors('status');
+        $this->post('/my-visits/'.$visit->id.'/respond', ['version' => 1, 'decision' => 'accept', 'evidence' => 'Synthetic roster checked', 'declaration' => true])->assertRedirect()->assertSessionHasNoErrors();
+        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 2, 'status' => 'confirmed', 'confirmation_evidence' => 'Synthetic patient confirmation after explicit provider acceptance'])->assertRedirect()->assertSessionHasNoErrors();
         $event['kind'] = 'arrival';
         $this->post('/my-visits/'.$visit->id.'/attendance', $event)->assertRedirect()->assertSessionHasNoErrors();
         $this->post('/my-visits/'.$visit->id.'/attendance', $event)->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseCount('attendance_events', 1);
-        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 3, 'status' => 'completed', 'completion_evidence' => 'Verified visit completion'])->assertSessionHasErrors('status');
+        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 4, 'status' => 'completed', 'completion_evidence' => 'Verified visit completion'])->assertSessionHasErrors('status');
         $this->post('/my-visits/'.$visit->id.'/attendance', [...$event, 'kind' => 'departure', 'request_id' => (string) Str::uuid()])->assertRedirect()->assertSessionHasNoErrors();
-        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 3, 'status' => 'completed', 'completion_evidence' => 'Verified operational completion; clinical review separate'])->assertRedirect()->assertSessionHasNoErrors();
+        $this->patch('/workspace/appointments/'.$visit->id, ['version' => 4, 'status' => 'completed', 'completion_evidence' => 'Verified operational completion; clinical review separate'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('completed', $visit->fresh()->status);
         $this->assertDatabaseCount('attendance_events', 2);
     }

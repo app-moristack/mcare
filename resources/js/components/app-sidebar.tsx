@@ -8,6 +8,7 @@ import { Link, usePage } from '@inertiajs/react';
 import {
     Briefcase,
     CalendarDays,
+    CalendarRange,
     ChevronLeft,
     ClipboardList,
     CreditCard,
@@ -29,6 +30,7 @@ function SidebarContents() {
         ...(allowed('dashboard.view') ? [{ title: 'Command centre', url: '/workspace/overview', icon: LayoutGrid }] : []),
         ...(allowed('patients.manage') ? [{ title: 'Patients', url: '/workspace/patients', icon: HeartPulse }] : []),
         ...(allowed('appointments.manage') ? [{ title: 'Appointments', url: '/workspace/appointments', icon: CalendarDays }] : []),
+        ...(allowed('appointments.manage') ? [{ title: 'Roster & missed visits', url: '/workspace/roster', icon: CalendarRange }] : []),
     ];
     const operations: NavigationLink[] = [
         { title: 'Referrals', url: '/workspace/referrals', icon: ClipboardList, permission: 'referrals.manage' },
@@ -41,6 +43,7 @@ function SidebarContents() {
         ...(auth.user.account_kind === 'provider_application' ? [{ title: 'My application', url: '/application', icon: Briefcase }] : []),
         { title: 'My care', url: '/my-care', icon: HeartPulse },
         ...((workspace?.organisations.length ?? 0) > 0 ? [{ title: 'My visits', url: '/my-visits', icon: CalendarDays }] : []),
+        ...((workspace?.organisations.length ?? 0) > 0 ? [{ title: 'My roster', url: '/my-roster', icon: CalendarRange }] : []),
         { title: 'Two-factor security', url: '/security/mfa', icon: ShieldCheck },
         { title: 'Account settings', url: '/settings/profile', icon: Settings },
     ];

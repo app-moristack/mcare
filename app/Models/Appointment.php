@@ -14,7 +14,7 @@ class Appointment extends Model
 
     protected function casts(): array
     {
-        return ['starts_at' => 'datetime', 'ends_at' => 'datetime'];
+        return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'offered_at' => 'datetime', 'offer_responded_at' => 'datetime', 'offer_evidence' => 'encrypted'];
     }
 
     public function patient()

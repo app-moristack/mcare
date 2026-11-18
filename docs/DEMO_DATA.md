@@ -43,4 +43,6 @@ For each new feature, extend `DemoDataSeeder` and its idempotency/coverage tests
 
 The base demo also creates category-scoped document-vault grants, one clearly labelled metadata-only quarantine record with no blob, and one rejected export example with no archive. The seeder never creates passport content, uploads a real file, contacts an external scanner or sends a document outside the application.
 
+Roster demo data includes approved synthetic availability for the care professionals, one pending synthetic travel review, explicit synthetic acceptance on seeded visits, and one open missed-visit welfare/replacement case with an accountable task. No real availability, travel, appointment, welfare contact or patient action is represented or performed.
+
 Use the nurse account to open **My visits → Notes and care plans**, autosave a draft or submit a replacement proposal. From the synthetic patient's record, the nurse can also open **Observations and vital chart** to review the retained synthetic trend or sign another visit-bound set. Use the clinical lead to approve and publish notes and plans; the coordinator is a suitable routine-review backup. The patient account sees only the published plain-language snapshots, not private observation charts. The administrator sees operational status, not private clinical contents through its admin role alone.

@@ -71,6 +71,7 @@ const schemas: Record<string, Field[]> = {
     appointments: [
         { key: 'patient_id', label: 'Patient', choices: 'patients' },
         { key: 'referral_id', label: 'Triaged referral', choices: 'referrals' },
+        { key: 'missed_visit_case_id', label: 'Open missed-visit case (replacement only)', choices: 'missed_cases', optional: true },
         { key: 'provider_id', label: 'Approved provider', choices: 'providers' },
         { key: 'service', label: 'Service / visit type' },
         { key: 'starts_at', label: 'Start (Mauritius)', type: 'datetime-local' },

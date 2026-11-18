@@ -6,9 +6,11 @@ use App\Models\AccountApplication;
 use App\Models\Appointment;
 use App\Models\CareTask;
 use App\Models\Invoice;
+use App\Models\MissedVisitCase;
 use App\Models\Patient;
 use App\Models\Referral;
 use App\Models\User;
+use App\Services\ProviderScheduling;
 use App\Services\Workspace;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -104,6 +106,7 @@ class OperationsController extends Controller
         if ($module === 'appointments') {
             $lookups['referrals'] = Referral::where('organisation_id', $org)->whereIn('status', ['awaiting_match', 'assessment_booked'])->with('patient:id,name')->get()->map(fn ($x) => ['id' => $x->id, 'name' => '#'.$x->id.' · '.$x->patient->name, 'patient_id' => $x->patient_id]);
             $lookups['providers'] = Workspace::staff($org)->when(config('mauricare.workforce_mfa_required'), fn ($q) => $q->whereNotNull('mfa_confirmed_at'))->whereHas('memberships', fn ($q) => $q->where('organisation_id', $org)->whereIn('role', ['doctor', 'nurse', 'carer', 'physiotherapist'])->where('status', 'active'))->select('id', 'name')->get();
+            $lookups['missed_cases'] = MissedVisitCase::where('organisation_id', $org)->where('status', 'open')->where('replacement_status', 'required')->with('patient:id,name')->get()->map(fn ($case) => ['id' => $case->id, 'name' => '#'.$case->id.' · '.$case->patient->name, 'patient_id' => $case->patient_id]);
         }
         $summary = $module === 'overview' ? [
             'patients' => Patient::where('organisation_id', $org)->count(),
@@ -133,6 +136,11 @@ class OperationsController extends Controller
             }
             $data = $this->validateCreate($r, $module, $org);
             $record = self::MODELS[$module]::create([...$data, 'organisation_id' => $org, 'request_id' => $r->request_id]);
+            if ($module === 'appointments' && $record->missed_visit_case_id) {
+                $case = MissedVisitCase::where('organisation_id', $org)->lockForUpdate()->findOrFail($record->missed_visit_case_id);
+                abort_unless($case->status === 'open' && $case->replacement_status === 'required' && $case->patient_id === $record->patient_id, 409, 'This missed-visit case no longer accepts a replacement.');
+                $case->update(['replacement_status' => 'booked', 'replacement_appointment_id' => $record->id, 'replacement_evidence' => 'Replacement visit #'.$record->id.' offered; acceptance and confirmation remain pending.', 'version' => $case->version + 1]);
+            }
             if ($module === 'invoices') {
                 foreach ($r->input('items') as $item) {
                     $record->items()->create(['description' => $item['description'], 'quantity' => $item['quantity'], 'unit_price_minor' => $item['unit_price_minor'], 'total_minor' => $item['quantity'] * $item['unit_price_minor']]);
@@ -173,7 +181,7 @@ class OperationsController extends Controller
             return [...$data, 'created_by' => $r->user()->id, 'due_at' => $this->date($data['due_at'])];
         }
         if ($module === 'appointments') {
-            $data = $r->validate(['patient_id' => 'required|integer', 'referral_id' => 'required|integer', 'provider_id' => 'required|integer', 'service' => 'required|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at', 'location_type' => ['required', Rule::in(['home', 'clinic'])], 'location' => 'required|string|max:2000']);
+            $data = $r->validate(['patient_id' => 'required|integer', 'referral_id' => 'required|integer', 'provider_id' => 'required|integer', 'missed_visit_case_id' => 'nullable|integer', 'service' => 'required|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at', 'location_type' => ['required', Rule::in(['home', 'clinic'])], 'location' => 'required|string|max:2000']);
             $referral = Referral::where('organisation_id', $org)->where('patient_id', $data['patient_id'])->findOrFail($data['referral_id']);
             if (! in_array($referral->status, ['awaiting_match', 'assessment_booked']) || ! $referral->triage_evidence) {
                 $this->fail('referral_id', 'A triaged referral awaiting scheduling is required.');
@@ -194,11 +202,20 @@ class OperationsController extends Controller
             if ($start->isPast()) {
                 $this->fail('starts_at', 'Choose a future appointment time.');
             }
-            if (Appointment::where('provider_id', $provider->id)->whereNotIn('status', ['cancelled', 'aborted'])->where('starts_at', '<', $end)->where('ends_at', '>', $start)->lockForUpdate()->first()) {
+            if (! ProviderScheduling::isAvailable($org, $provider->id, $start, $end)) {
+                $this->fail('starts_at', 'The visit must fit inside approved availability and cannot overlap approved leave or travel.');
+            }
+            if (Appointment::where('provider_id', $provider->id)->whereNotIn('status', ['cancelled', 'aborted', 'declined', 'missed'])->where('starts_at', '<', $end)->where('ends_at', '>', $start)->lockForUpdate()->first()) {
                 $this->fail('starts_at', 'This provider already has an overlapping appointment.');
             }
+            if (! empty($data['missed_visit_case_id'])) {
+                $case = MissedVisitCase::where('organisation_id', $org)->where('patient_id', $data['patient_id'])->find($data['missed_visit_case_id']);
+                if (! $case || $case->status !== 'open' || $case->replacement_status !== 'required') {
+                    $this->fail('missed_visit_case_id', 'Choose a current open missed-visit case for this patient.');
+                }
+            }
 
-            return [...$data, 'starts_at' => $start, 'ends_at' => $end];
+            return [...$data, 'starts_at' => $start, 'ends_at' => $end, 'offered_at' => now()];
         }
         $data = $r->validate(['patient_id' => 'required|integer', 'due_date' => 'required|date_format:Y-m-d', 'items' => 'required|array|min:1|max:30', 'items.*.description' => 'required|string|max:255', 'items.*.quantity' => 'required|integer|min:1|max:10000', 'items.*.unit_price_minor' => 'required|integer|min:0|max:100000000']);
 
@@ -272,7 +289,16 @@ class OperationsController extends Controller
                     $this->fail('status', 'This appointment transition is not allowed.');
                 }
                 if ($status === 'confirmed') {
+                    if ($record->offer_status !== 'accepted') {
+                        $this->fail('status', 'The assigned provider must explicitly accept this visit before confirmation.');
+                    }
                     $data['confirmation_evidence'] = $r->validate(['confirmation_evidence' => 'required|string|max:2000'])['confirmation_evidence'];
+                    if ($record->missed_visit_case_id) {
+                        $case = MissedVisitCase::where('organisation_id', $org)->lockForUpdate()->find($record->missed_visit_case_id);
+                        if ($case && $case->replacement_appointment_id === $record->id && $case->status === 'open') {
+                            $case->update(['replacement_evidence' => 'Replacement visit #'.$record->id.' accepted and operationally confirmed.', 'version' => $case->version + 1]);
+                        }
+                    }
                 }
                 if ($status === 'completed') {
                     if ($record->attendance()->count() !== 2) {
@@ -282,6 +308,12 @@ class OperationsController extends Controller
                 }
                 if (in_array($status, ['cancelled', 'aborted'])) {
                     $data['cancellation_reason'] = $r->validate(['cancellation_reason' => 'required|string|max:2000'])['cancellation_reason'];
+                    if ($record->missed_visit_case_id) {
+                        $case = MissedVisitCase::where('organisation_id', $org)->lockForUpdate()->find($record->missed_visit_case_id);
+                        if ($case && $case->replacement_appointment_id === $record->id && $case->status === 'open') {
+                            $case->update(['replacement_status' => 'required', 'replacement_appointment_id' => null, 'replacement_evidence' => 'Replacement visit #'.$record->id.' was '.$status.'; another replacement is required.', 'version' => $case->version + 1]);
+                        }
+                    }
                 }
             } else {
                 if (! ($record->status === 'draft' && in_array($status, ['issued', 'void'])) && ! ($record->status === 'issued' && $status === 'void')) {
