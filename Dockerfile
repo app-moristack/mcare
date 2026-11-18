@@ -23,7 +23,7 @@ RUN sed -i 's/Listen 80/Listen 8080/' /etc/apache2/ports.conf \
     && printf '\nServerName localhost\nServerTokens Prod\nServerSignature Off\n' >> /etc/apache2/apache2.conf \
     && mkdir -p bootstrap/cache \
     && composer dump-autoload --no-dev --optimize \
-    && mkdir -p storage/app/public storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs \
+    && mkdir -p storage/app/public storage/app/private storage/framework/cache/data storage/framework/sessions storage/framework/views storage/logs \
     && ln -s /var/www/html/storage/app/public public/storage \
     && find app bootstrap config database public resources routes -type d -exec chmod 755 {} + \
     && chown -R www-data:www-data storage bootstrap/cache /var/run/apache2 /var/lock/apache2 \

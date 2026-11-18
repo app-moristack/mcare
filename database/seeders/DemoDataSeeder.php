@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use App\Models\Appointment;
 use App\Models\CareTask;
 use App\Models\ClinicalObservation;
+use App\Models\DocumentExport;
 use App\Models\Investigation;
 use App\Models\InvestigationPublication;
 use App\Models\InvestigationResult;
@@ -16,6 +17,7 @@ use App\Models\Organisation;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\PatientAssessment;
+use App\Models\PatientDocument;
 use App\Models\PatientSummary;
 use App\Models\Referral;
 use App\Models\User;
@@ -111,11 +113,11 @@ class DemoDataSeeder extends Seeder
                     PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('assignment-'.$i.'-'.$key)], $rule);
                     $scopes = $key === 'physio' ? ['summary.read'] : ['summary.read', 'basic.read', 'nursing.read', 'observations.read', 'medications.read', 'medications.reconcile', 'investigations.read', 'results.read'];
                     if ($key === 'nurse') {
-                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write', 'medications.administer', 'results.receive']);
+                        $scopes = array_merge($scopes, ['summary.write', 'basic.write', 'nursing.write', 'observations.write', 'medications.administer', 'results.receive', 'documents.clinical.read', 'documents.administrative.read', 'documents.upload', 'documents.export']);
                     } elseif ($key === 'doctor') {
-                        $scopes = array_merge($scopes, ['medications.verify', 'investigations.request', 'results.acknowledge']);
+                        $scopes = array_merge($scopes, ['medications.verify', 'investigations.request', 'results.acknowledge', 'documents.identity.read', 'documents.clinical.read', 'documents.upload', 'documents.export']);
                     }if ($key === 'lead') {
-                        $scopes = array_merge($scopes, ['nursing.cosign', 'results.receive', 'results.publish']);
+                        $scopes = array_merge($scopes, ['nursing.cosign', 'results.receive', 'results.publish', 'documents.identity.read', 'documents.clinical.read', 'documents.administrative.read', 'documents.upload', 'documents.review', 'documents.export']);
                     }
                     foreach ($scopes as $scope) {
                         PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('grant-'.$i.'-'.$key.'-'.$scope)], [...$rule, 'kind' => 'grant', 'scope' => $scope, 'role' => null, 'authority_type' => 'patient_consent', 'evidence' => 'Synthetic demo authority for '.$scope.'; no real patient data.']);
@@ -278,6 +280,28 @@ class DemoDataSeeder extends Seeder
                 $result->update(['task_id' => $resultTask->id]);
             }
             InvestigationPublication::firstOrCreate(['request_id' => $this->uuid('investigation-publication')], ['patient_id' => $patients[0]->id, 'investigation_result_id' => $result->id, 'content' => ['summary' => 'Reviewed synthetic result summary for portal demonstration only.', 'next_steps' => 'Synthetic next step: contact the demo care team.'], 'source_hash' => $result->content_hash, 'published_by' => $users['lead']->id, 'published_at' => now()->subMinutes(20)]);
+            $demoDocument = PatientDocument::firstOrCreate(['request_id' => $this->uuid('document-metadata-only')], [
+                'patient_id' => $patients[0]->id,
+                'uploaded_by' => $users['nurse']->id,
+                'category' => 'clinical',
+                'original_name' => 'DEMO-metadata-only-no-file.pdf',
+                'mime_type' => 'application/pdf',
+                'size_bytes' => 0,
+                'sha256' => hash('sha256', ''),
+                'storage_path' => null,
+                'status' => 'quarantined',
+                'description' => 'SYNTHETIC metadata-only quarantine example. No file or patient content was created.',
+            ]);
+            DocumentExport::firstOrCreate(['request_id' => $this->uuid('document-export-rejected')], [
+                'patient_id' => $patients[0]->id,
+                'requested_by' => $users['doctor']->id,
+                'document_ids' => [$demoDocument->id],
+                'purpose' => 'SYNTHETIC rejected export demonstration; no recipient and no disclosure.',
+                'status' => 'rejected',
+                'review_evidence' => 'Synthetic reviewer rejection because the metadata-only demonstration record has no releasable file.',
+                'reviewed_by' => $users['lead']->id,
+                'reviewed_at' => now()->subMinutes(10),
+            ]);
             $this->call(ClinicalRecordDemoSeeder::class);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {

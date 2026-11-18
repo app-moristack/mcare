@@ -15,6 +15,7 @@ x-app: &app
     - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0755
   volumes:
     - uploads:/var/www/html/storage/app/public
+    - private-vault:/var/www/html/storage/app/private
     - runtime:/var/www/html/storage/framework
   networks: [frontend, database]
   depends_on:
@@ -77,6 +78,7 @@ networks:
 volumes:
   mysql-data:
   uploads:
+  private-vault:
   runtime:
 
 secrets:
