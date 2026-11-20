@@ -131,6 +131,11 @@ class OperationsTest extends TestCase
         $this->assertDatabaseCount('attendance_events', 1);
         $this->patch('/workspace/appointments/'.$visit->id, ['version' => 4, 'status' => 'completed', 'completion_evidence' => 'Verified visit completion'])->assertSessionHasErrors('status');
         $this->post('/my-visits/'.$visit->id.'/attendance', [...$event, 'kind' => 'departure', 'request_id' => (string) Str::uuid()])->assertRedirect()->assertSessionHasNoErrors();
+        $this->actingAs($this->backup);
+        foreach ($visit->attendance()->get() as $attendance) {
+            $this->post('/workspace/attendance-events/'.$attendance->id.'/review', ['request_id' => (string) Str::uuid(), 'decision' => 'confirmed_exception', 'evidence' => 'Synthetic coordinator confirmed the location exception.'])->assertSessionHasNoErrors();
+        }
+        $this->actingAs($this->admin);
         $this->patch('/workspace/appointments/'.$visit->id, ['version' => 4, 'status' => 'completed', 'completion_evidence' => 'Verified operational completion; clinical review separate'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertSame('completed', $visit->fresh()->status);
         $this->assertDatabaseCount('attendance_events', 2);

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Clock, MapPin } from 'lucide-react';
 import { useState } from 'react';
 type Visit = {
@@ -14,8 +14,75 @@ type Visit = {
     ends_at: string;
     location: string;
     patient: { id: number; name: string; reference: string };
-    attendance: { kind: string; occurred_at: string }[];
+    attendance: {
+        id: number;
+        kind: string;
+        occurred_at: string;
+        capture_status: string;
+        exception_reason: string | null;
+        review: { decision: string } | null;
+        corrections: { id: number; status: string; proposed_occurred_at: string }[];
+    }[];
 };
+function CorrectionRequest({ visitId, event }: { visitId: number; event: Visit['attendance'][number] }) {
+    const form = useForm({ request_id: crypto.randomUUID(), proposed_occurred_at: '', reason: '', evidence: '', declaration: false as boolean });
+    return (
+        <form
+            className="mt-3 space-y-3 rounded-xl border p-3"
+            onSubmit={(submit) => {
+                submit.preventDefault();
+                form.post(`/my-visits/${visitId}/attendance/${event.id}/corrections`, { preserveScroll: true });
+            }}
+        >
+            <p className="text-sm font-medium">Request an append-only correction</p>
+            <label className="text-sm">
+                Proposed actual time *
+                <input
+                    className="mt-1 w-full"
+                    type="datetime-local"
+                    required
+                    value={form.data.proposed_occurred_at}
+                    onChange={(change) => form.setData('proposed_occurred_at', change.target.value)}
+                />
+            </label>
+            <textarea
+                className="w-full"
+                rows={2}
+                required
+                maxLength={3000}
+                placeholder="Why the source time needs correction *"
+                value={form.data.reason}
+                onChange={(change) => form.setData('reason', change.target.value)}
+            />
+            <textarea
+                className="w-full"
+                rows={2}
+                required
+                maxLength={3000}
+                placeholder="Evidence supporting the proposed time *"
+                value={form.data.evidence}
+                onChange={(change) => form.setData('evidence', change.target.value)}
+            />
+            <label className="flex items-start gap-2 text-sm">
+                <input
+                    className="mt-1"
+                    type="checkbox"
+                    checked={form.data.declaration}
+                    onChange={(change) => form.setData('declaration', change.target.checked)}
+                />{' '}
+                I confirm this request is accurate and understand the source event remains retained.
+            </label>
+            {Object.keys(form.errors).length > 0 && (
+                <p className="text-destructive text-sm" role="alert">
+                    {Object.values(form.errors).join(' ')}
+                </p>
+            )}
+            <Button variant="outline" disabled={form.processing}>
+                {form.processing ? 'Submitting…' : 'Request correction'}
+            </Button>
+        </form>
+    );
+}
 export default function Visits({ visits }: { visits: { data: Visit[]; links: { url: string | null; label: string }[] } }) {
     const [active, setActive] = useState<Visit>();
     const [kind, setKind] = useState('arrival');
@@ -80,9 +147,25 @@ export default function Visits({ visits }: { visits: { data: Visit[]; links: { u
                             </p>
                             <div className="text-muted-foreground mt-5 space-y-2 text-sm">
                                 {v.attendance.map((a) => (
-                                    <p key={a.kind}>
-                                        {a.kind}: {new Date(a.occurred_at).toLocaleString('en-GB', { timeZone: 'Indian/Mauritius' })}
-                                    </p>
+                                    <div className="rounded-xl border p-3" key={a.kind}>
+                                        <p>
+                                            {a.kind}: {new Date(a.occurred_at).toLocaleString('en-GB', { timeZone: 'Indian/Mauritius' })}
+                                        </p>
+                                        <p className="text-xs">
+                                            Location: {a.capture_status}
+                                            {a.review ? ` · review ${a.review.decision.replaceAll('_', ' ')}` : ''}
+                                        </p>
+                                        {a.corrections.map((correction) => (
+                                            <p className="mt-1 text-xs" key={correction.id}>
+                                                Correction {correction.status}:{' '}
+                                                {new Date(correction.proposed_occurred_at).toLocaleString('en-GB', { timeZone: 'Indian/Mauritius' })}
+                                            </p>
+                                        ))}
+                                        {a.review?.decision === 'correction_required' &&
+                                            !a.corrections.some((correction) => ['pending', 'approved'].includes(correction.status)) && (
+                                                <CorrectionRequest visitId={v.id} event={a} />
+                                            )}
+                                    </div>
                                 ))}
                             </div>
                             {(v.status === 'confirmed' || (v.status === 'arrived' && !v.attendance.some((a) => a.kind === 'departure'))) && (

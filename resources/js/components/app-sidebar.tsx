@@ -11,6 +11,7 @@ import {
     CalendarRange,
     ChevronLeft,
     ClipboardList,
+    Clock,
     CreditCard,
     HeartPulse,
     LayoutGrid,
@@ -31,6 +32,7 @@ function SidebarContents() {
         ...(allowed('patients.manage') ? [{ title: 'Patients', url: '/workspace/patients', icon: HeartPulse }] : []),
         ...(allowed('appointments.manage') ? [{ title: 'Appointments', url: '/workspace/appointments', icon: CalendarDays }] : []),
         ...(allowed('appointments.manage') ? [{ title: 'Roster & missed visits', url: '/workspace/roster', icon: CalendarRange }] : []),
+        ...(allowed('appointments.manage') ? [{ title: 'Attendance review', url: '/workspace/attendance-review', icon: Clock }] : []),
     ];
     const operations: NavigationLink[] = [
         { title: 'Referrals', url: '/workspace/referrals', icon: ClipboardList, permission: 'referrals.manage' },

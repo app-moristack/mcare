@@ -304,6 +304,15 @@ class OperationsController extends Controller
                     if ($record->attendance()->count() !== 2) {
                         $this->fail('status', 'Arrival and departure events are required.');
                     }
+                    $unreviewedExceptions = $record->attendance()->where('capture_status', '!=', 'obtained')->get()->contains(function ($event) {
+                        $confirmed = $event->review()->where('decision', 'confirmed_exception')->exists();
+                        $corrected = $event->corrections()->where('status', 'approved')->exists();
+
+                        return ! $confirmed && ! $corrected;
+                    });
+                    if ($unreviewedExceptions) {
+                        $this->fail('status', 'Every location exception requires operational confirmation or an approved correction before completion.');
+                    }
                     $data['completion_evidence'] = $r->validate(['completion_evidence' => 'required|string|max:5000'])['completion_evidence'];
                 }
                 if (in_array($status, ['cancelled', 'aborted'])) {

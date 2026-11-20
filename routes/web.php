@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AssessmentController;
+use App\Http\Controllers\AttendanceReviewController;
 use App\Http\Controllers\CarePortalController;
 use App\Http\Controllers\ClinicalObservationController;
 use App\Http\Controllers\ClinicalRecordController;
@@ -86,6 +87,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/search', GlobalSearchController::class)->middleware('throttle:60,1');
         Route::get('/my-visits', [ProviderVisitController::class, 'index']);
         Route::post('/my-visits/{id}/attendance', [ProviderVisitController::class, 'attendance']);
+        Route::post('/my-visits/{appointmentId}/attendance/{eventId}/corrections', [AttendanceReviewController::class, 'requestCorrection'])->whereNumber(['appointmentId', 'eventId']);
         Route::get('/my-roster', [RosterController::class, 'own']);
         Route::post('/my-roster', [RosterController::class, 'store']);
         Route::post('/my-roster/{entryId}/cancel', [RosterController::class, 'cancel'])->whereNumber('entryId');
@@ -96,6 +98,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/workspace/missed-visits/{caseId}/welfare', [MissedVisitController::class, 'welfare'])->whereNumber('caseId');
         Route::post('/workspace/missed-visits/{caseId}/waive-replacement', [MissedVisitController::class, 'waiveReplacement'])->whereNumber('caseId');
         Route::post('/workspace/missed-visits/{caseId}/resolve', [MissedVisitController::class, 'resolve'])->whereNumber('caseId');
+        Route::get('/workspace/attendance-review', [AttendanceReviewController::class, 'index']);
+        Route::post('/workspace/attendance-events/{eventId}/review', [AttendanceReviewController::class, 'reviewEvent'])->whereNumber('eventId');
+        Route::post('/workspace/attendance-corrections/{correctionId}/review', [AttendanceReviewController::class, 'reviewCorrection'])->whereNumber('correctionId');
         Route::post('/workspace/invoices/{id}/payments', [OperationsController::class, 'payment']);
         Route::patch('/workspace/team/applications/{id}', [OperationsController::class, 'reviewApplication']);
         Route::post('/workspace/team/memberships', [OperationsController::class, 'addMembership']);

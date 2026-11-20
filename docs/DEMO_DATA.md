@@ -45,4 +45,6 @@ The base demo also creates category-scoped document-vault grants, one clearly la
 
 Roster demo data includes approved synthetic availability for the care professionals, one pending synthetic travel review, explicit synthetic acceptance on seeded visits, and one open missed-visit welfare/replacement case with an accountable task. No real availability, travel, appointment, welfare contact or patient action is represented or performed.
 
+Attendance demo data includes an independently confirmed synthetic location exception and a separate synthetic exception with an approved append-only time correction. The original attendance events remain retained, and no real location or visit evidence is represented.
+
 Use the nurse account to open **My visits → Notes and care plans**, autosave a draft or submit a replacement proposal. From the synthetic patient's record, the nurse can also open **Observations and vital chart** to review the retained synthetic trend or sign another visit-bound set. Use the clinical lead to approve and publish notes and plans; the coordinator is a suitable routine-review backup. The patient account sees only the published plain-language snapshots, not private observation charts. The administrator sees operational status, not private clinical contents through its admin role alone.

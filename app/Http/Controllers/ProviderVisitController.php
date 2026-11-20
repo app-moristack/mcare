@@ -21,7 +21,7 @@ class ProviderVisitController extends Controller
     {
         $orgs = Workspace::memberships($r->user())->whereIn('role', ['doctor', 'nurse', 'carer', 'physiotherapist'])->pluck('organisation_id');
 
-        return Inertia::render('care/visits', ['visits' => Appointment::where('provider_id', $r->user()->id)->whereIn('organisation_id', $orgs)->with(['patient:id,name,reference', 'attendance'])->orderByDesc('starts_at')->paginate(15)]);
+        return Inertia::render('care/visits', ['visits' => Appointment::where('provider_id', $r->user()->id)->whereIn('organisation_id', $orgs)->with(['patient:id,name,reference', 'attendance.review', 'attendance.corrections' => fn ($query) => $query->latest()])->orderByDesc('starts_at')->paginate(15)]);
     }
 
     public function attendance(Request $r, int $id)

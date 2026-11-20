@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\Appointment;
+use App\Models\AttendanceCorrection;
+use App\Models\AttendanceReview;
 use App\Models\CareTask;
 use App\Models\ClinicalObservation;
 use App\Models\DocumentExport;
@@ -165,9 +167,18 @@ class DemoDataSeeder extends Seeder
             if ($past->offer_status === 'pending') {
                 $past->update(['offer_status' => 'accepted', 'offered_at' => $past->created_at, 'offer_responded_at' => $past->created_at, 'offer_evidence' => 'Synthetic provider acceptance; no real visit.']);
             }
+            $attendanceEvents = [];
             foreach (['arrival' => 0, 'departure' => 45] as $kind => $minutes) {
-                $past->attendance()->firstOrCreate(['kind' => $kind], ['actor_id' => $users['nurse']->id, 'occurred_at' => $past->starts_at->copy()->addMinutes($minutes), 'received_at' => $past->starts_at->copy()->addMinutes($minutes), 'capture_status' => 'denied', 'exception_reason' => 'Synthetic demo: no real location collected.', 'request_id' => $this->uuid('attendance-'.$kind)]);
+                $attendanceEvents[$kind] = $past->attendance()->firstOrCreate(['kind' => $kind], ['actor_id' => $users['nurse']->id, 'occurred_at' => $past->starts_at->copy()->addMinutes($minutes), 'received_at' => $past->starts_at->copy()->addMinutes($minutes), 'capture_status' => 'denied', 'exception_reason' => 'Synthetic demo: no real location collected.', 'request_id' => $this->uuid('attendance-'.$kind)]);
             }
+            AttendanceReview::firstOrCreate(['request_id' => $this->uuid('attendance-review-arrival')], ['attendance_event_id' => $attendanceEvents['arrival']->id, 'decision' => 'confirmed_exception', 'evidence' => 'SYNTHETIC location exception review; no real attendance was verified.', 'reviewed_by' => $users['lead']->id, 'reviewed_at' => now()->subHours(20)]);
+            AttendanceReview::firstOrCreate(['request_id' => $this->uuid('attendance-review-departure')], ['attendance_event_id' => $attendanceEvents['departure']->id, 'decision' => 'correction_required', 'evidence' => 'SYNTHETIC correction request demonstration only.', 'reviewed_by' => $users['lead']->id, 'reviewed_at' => now()->subHours(19)]);
+            AttendanceCorrection::firstOrCreate(['request_id' => $this->uuid('attendance-correction-departure')], [
+                'attendance_event_id' => $attendanceEvents['departure']->id, 'appointment_id' => $past->id, 'requested_by' => $users['nurse']->id,
+                'proposed_occurred_at' => $past->starts_at->copy()->addMinutes(44), 'reason' => 'SYNTHETIC one-minute correction example.',
+                'evidence' => 'Synthetic workflow evidence; no real visit record.', 'status' => 'approved', 'reviewed_by' => $users['lead']->id,
+                'review_evidence' => 'Synthetic independent approval.', 'reviewed_at' => now()->subHours(18),
+            ]);
             $missedVisit = Appointment::firstOrCreate(['organisation_id' => $org->id, 'request_id' => $this->uuid('missed-visit')], [
                 'patient_id' => $patients[1]->id, 'referral_id' => $visits[1]->referral_id, 'provider_id' => $users['nurse']->id,
                 'service' => 'SYNTHETIC missed visit demonstration', 'starts_at' => now()->subDays(2)->startOfHour(), 'ends_at' => now()->subDays(2)->startOfHour()->addMinutes(45),
