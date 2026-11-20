@@ -189,11 +189,14 @@ class OperationsTest extends TestCase
     {
         $user = User::factory()->create(['account_kind' => 'provider_application']);
         $app = $user->application()->create(['kind' => 'provider_application', 'organisation_id' => $this->org->id, 'discipline' => 'nurse', 'credential_reference' => 'SYNTHETIC-REG', 'credential_expires_at' => '2020-01-01']);
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('accountExperience', 'application_pending'));
+        $this->actingAs($this->admin);
         $this->patch('/workspace/team/applications/'.$app->id, ['status' => 'approved', 'review_evidence' => 'Reviewed synthetic credential'])->assertSessionHasErrors('status');
         $app->update(['credential_expires_at' => '2030-01-01']);
         $this->patch('/workspace/team/applications/'.$app->id, ['status' => 'approved', 'review_evidence' => 'Reviewed synthetic credential'])->assertRedirect()->assertSessionHasNoErrors();
         $this->assertDatabaseHas('memberships', ['user_id' => $user->id, 'role' => 'nurse', 'status' => 'active']);
         $this->assertFalse($user->hasPermission('patients.manage', $this->org->id));
+        $this->actingAs($user)->get('/dashboard')->assertInertia(fn (Assert $page) => $page->where('accountExperience', 'professional_approved'));
     }
 
     public function test_patient_portal_does_not_link_on_email_or_expose_other_records(): void

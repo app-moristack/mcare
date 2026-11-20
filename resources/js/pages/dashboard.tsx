@@ -7,12 +7,12 @@ import { ArrowUpRight, CheckCircle2, Circle, ClipboardList, FileHeart, ShieldChe
 type Profile = { public_id: string; onboarding_completed_at: string | null } | null;
 export default function Dashboard({
     patientProfile,
-    application,
     adminAccess,
+    accountExperience,
 }: {
     patientProfile: Profile;
-    application: { status: string } | null;
     adminAccess: { roles: string[]; permissions: string[] } | null;
+    accountExperience: 'administration' | 'professional_approved' | 'application_rejected' | 'application_pending' | 'personal';
 }) {
     const { auth } = usePage<SharedData>().props;
     const verified = !!auth.user.email_verified_at;
@@ -29,13 +29,17 @@ export default function Dashboard({
                         <p className="text-muted-foreground mt-2">Let’s get your account ready for your care journey.</p>
                     </div>
                     <span className="bg-accent text-accent-foreground rounded-full px-4 py-2 text-xs font-medium">
-                        {adminAccess
+                        {accountExperience === 'administration'
                             ? 'Administrator'
-                            : application
-                              ? 'Application pending'
-                              : auth.user.account_kind === 'proxy'
-                                ? 'Representative account'
-                                : 'Personal account'}
+                            : accountExperience === 'professional_approved'
+                              ? 'Approved professional'
+                              : accountExperience === 'application_rejected'
+                                ? 'Application not approved'
+                                : accountExperience === 'application_pending'
+                                  ? 'Application pending'
+                                  : auth.user.account_kind === 'proxy'
+                                    ? 'Representative account'
+                                    : 'Personal account'}
                     </span>
                 </div>
                 {!verified && (
@@ -91,7 +95,7 @@ export default function Dashboard({
                             ))}
                         </ul>
                     </section>
-                ) : application ? (
+                ) : accountExperience === 'application_pending' ? (
                     <section className="bg-card rounded-lg border p-6 shadow-xs">
                         <ShieldCheck className="text-primary size-9" />
                         <h2 className="mt-4 text-2xl font-semibold">Your application is awaiting review</h2>
@@ -102,6 +106,38 @@ export default function Dashboard({
                             Thank you for applying to join MauriCare. Professional and partner access requires identity, credentials, organisation
                             approval. Optional authenticator security is available. Your account currently has no staff or patient-record access.
                         </p>
+                    </section>
+                ) : accountExperience === 'professional_approved' ? (
+                    <section className="bg-card rounded-lg border p-6 shadow-xs">
+                        <CheckCircle2 className="text-primary size-9" />
+                        <h2 className="mt-4 text-2xl font-semibold">Your professional access is approved</h2>
+                        <p className="text-muted-foreground mt-3 max-w-2xl leading-relaxed">
+                            Open your assigned visits and roster below. Patient records and clinical actions remain limited by your current
+                            organisation, role, named assignments and explicit grants.
+                        </p>
+                        <div className="mt-5 flex flex-wrap gap-3">
+                            <Link
+                                href="/my-visits"
+                                className="bg-primary text-primary-foreground inline-flex min-h-11 items-center gap-2 rounded-md px-5 py-3 text-sm font-medium"
+                            >
+                                Open my visits <ArrowUpRight className="size-4" />
+                            </Link>
+                            <Link href="/my-roster" className="inline-flex min-h-11 items-center rounded-md border px-5 py-3 text-sm font-medium">
+                                Open my roster
+                            </Link>
+                        </div>
+                    </section>
+                ) : accountExperience === 'application_rejected' ? (
+                    <section className="bg-card rounded-lg border p-6 shadow-xs">
+                        <ShieldCheck className="text-primary size-9" />
+                        <h2 className="mt-4 text-2xl font-semibold">Your application was not approved</h2>
+                        <p className="text-muted-foreground mt-3 max-w-xl leading-relaxed">
+                            No professional or patient-record access was granted. Review the application record and contact the organisation if
+                            updated evidence needs to be considered.
+                        </p>
+                        <Link href="/application" className="text-primary mt-4 inline-block font-medium underline">
+                            Review application status
+                        </Link>
                     </section>
                 ) : patientProfile ? (
                     <section className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
