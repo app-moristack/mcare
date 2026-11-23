@@ -5,6 +5,8 @@ namespace Database\Seeders;
 use App\Models\Appointment;
 use App\Models\AttendanceCorrection;
 use App\Models\AttendanceReview;
+use App\Models\CareEpisode;
+use App\Models\CarePlan;
 use App\Models\CareTask;
 use App\Models\ClinicalObservation;
 use App\Models\DocumentExport;
@@ -350,6 +352,32 @@ class DemoDataSeeder extends Seeder
                 'reviewed_by' => $users['lead']->id,
                 'reviewed_at' => now()->subMinutes(10),
             ]);
+            $dischargePatient = Patient::firstOrCreate(['organisation_id' => $org->id, 'request_id' => $this->uuid('discharge-patient')], [
+                'reference' => $this->uuid('discharge-patient-ref'),
+                'name' => 'Demo Discharge Patient',
+                'locality' => 'Curepipe',
+                'address' => 'Synthetic demonstration address.',
+                'authority_type' => 'patient_request',
+                'authority_evidence' => 'Synthetic episode discharge demonstration only.',
+            ]);
+            PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('discharge-assignment')], [
+                'patient_id' => $dischargePatient->id, 'user_id' => $users['lead']->id, 'scope' => 'all',
+                'kind' => 'assignment', 'role' => 'clinical_admin', 'purpose' => 'Synthetic discharge review',
+                'authority_type' => 'care_assignment', 'evidence' => 'Synthetic authority only.', 'wording_version' => 'DEMO-v1',
+                'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(), 'recorded_by' => $admin->id,
+            ]);
+            $dischargeEpisode = CareEpisode::firstOrCreate(['request_id' => $this->uuid('discharge-episode')], [
+                'patient_id' => $dischargePatient->id, 'title' => 'Demo episode ready for discharge', 'created_by' => $users['nurse']->id,
+            ]);
+            $dischargePlan = CarePlan::firstOrCreate(['request_id' => $this->uuid('discharge-plan')], [
+                'patient_id' => $dischargePatient->id, 'episode_id' => $dischargeEpisode->id, 'author_id' => $users['nurse']->id,
+                'revision_number' => 1, 'content' => ClinicalRecordDemoSeeder::planContent($users['nurse']->id), 'status' => 'completed',
+                'signed_by' => $users['nurse']->id, 'signed_at' => now()->subDays(2),
+                'approved_by' => $users['lead']->id, 'approved_at' => now()->subDay(),
+            ]);
+            if ($dischargePlan->wasRecentlyCreated) {
+                $dischargePlan->update(['content_hash' => $dischargePlan->digest($dischargePlan->content)]);
+            }
             $this->call(ClinicalRecordDemoSeeder::class);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {

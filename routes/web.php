@@ -7,6 +7,7 @@ use App\Http\Controllers\ClinicalObservationController;
 use App\Http\Controllers\ClinicalRecordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentVaultController;
+use App\Http\Controllers\EpisodeDischargeController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InvestigationController;
 use App\Http\Controllers\MedicationController;
@@ -51,6 +52,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/application', [CarePortalController::class, 'submitApplication']);
     Route::middleware(RequireWorkforceMfa::class)->group(function () {
         Route::get('/patient-records/{id}/clinical', [ClinicalRecordController::class, 'index'])->whereNumber('id');
+        Route::post('/patient-records/{id}/clinical/episodes/{episode}/discharge', [EpisodeDischargeController::class, 'store'])->whereNumber(['id', 'episode']);
         Route::post('/patient-records/{id}/clinical/{kind}', [ClinicalRecordController::class, 'store'])->whereNumber('id');
         Route::patch('/patient-records/{id}/clinical/{kind}/{record}', [ClinicalRecordController::class, 'update'])->whereNumber(['id', 'record']);
         Route::post('/patient-records/{id}/clinical/plans/{record}/transition', [ClinicalRecordController::class, 'transition'])->whereNumber(['id', 'record']);

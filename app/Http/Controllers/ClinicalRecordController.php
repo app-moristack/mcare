@@ -124,7 +124,11 @@ class ClinicalRecordController extends Controller
             }
         }
 
-        return Inertia::render('clinical/index', ['patient' => $p->only(['id', 'name', 'reference']), 'manage' => $manage, 'permissions' => $permissions, 'noteTypes' => $types, 'rows' => array_merge($notes->all(), $plans->all()), 'schema' => config('clinical.forms'), 'episodes' => CareEpisode::where('patient_id', $id)->get(['id', 'title', 'current_plan_id']), 'visits' => Appointment::where('patient_id', $id)->where('provider_id', $r->user()->id)->whereIn('status', ['confirmed', 'arrived', 'completed', 'aborted'])->get(['id', 'service', 'starts_at']), 'referrals' => Referral::where('patient_id', $id)->get(['id', 'discipline']), 'staff' => Workspace::staff($p->organisation_id)->whereIn('id', PatientAccessRule::where('patient_id', $id)->where('kind', 'assignment')->whereIn('role', ['doctor', 'nurse', 'physiotherapist', 'carer'])->whereNull('revoked_at')->where('starts_at', '<=', now())->where('ends_at', '>', now())->select('user_id'))->select('id', 'name')->orderBy('name')->get(), 'reviewBackups' => Workspace::staff($p->organisation_id)->get()->filter(fn ($u) => $u->id !== $r->user()->id && $u->hasPermission('tasks.manage', $p->organisation_id))->values()->map(fn ($u) => $u->only(['id', 'name']))]);
+        return Inertia::render('clinical/index', ['patient' => $p->only(['id', 'name', 'reference']), 'manage' => $manage, 'permissions' => $permissions, 'noteTypes' => $types, 'rows' => array_merge($notes->all(), $plans->all()), 'schema' => config('clinical.forms'), 'episodes' => CareEpisode::where('patient_id', $id)->with('discharge')->get(['id', 'title', 'current_plan_id'])->map(fn ($episode) => [
+            ...$episode->only(['id', 'title', 'current_plan_id']),
+            'discharged_at' => $episode->discharge?->signed_at,
+            'discharge' => $permissions['plans']['read'] ? $episode->discharge?->only(['signed_by', 'content', 'signed_at']) : null,
+        ]), 'visits' => Appointment::where('patient_id', $id)->where('provider_id', $r->user()->id)->whereIn('status', ['confirmed', 'arrived', 'completed', 'aborted'])->get(['id', 'service', 'starts_at']), 'referrals' => Referral::where('patient_id', $id)->get(['id', 'discipline']), 'staff' => Workspace::staff($p->organisation_id)->whereIn('id', PatientAccessRule::where('patient_id', $id)->where('kind', 'assignment')->whereIn('role', ['doctor', 'nurse', 'physiotherapist', 'carer'])->whereNull('revoked_at')->where('starts_at', '<=', now())->where('ends_at', '>', now())->select('user_id'))->select('id', 'name')->orderBy('name')->get(), 'reviewBackups' => Workspace::staff($p->organisation_id)->get()->filter(fn ($u) => $u->id !== $r->user()->id && $u->hasPermission('tasks.manage', $p->organisation_id))->values()->map(fn ($u) => $u->only(['id', 'name']))]);
     }
 
     private function visit(Request $r, Patient $p, int $id): Appointment
@@ -182,6 +186,7 @@ class ClinicalRecordController extends Controller
                         Referral::where('patient_id', $p->id)->findOrFail($d['referral_id']);
                     }$episode = CareEpisode::create(['patient_id' => $p->id, 'referral_id' => $d['referral_id'] ?? null, 'title' => $d['episode_title'], 'created_by' => $r->user()->id, 'request_id' => $r->request_id]);
                 }
+                abort_if($episode->discharge()->exists(), 409, 'This episode has been discharged. Create a new episode for new care.');
                 CarePlan::create(['patient_id' => $p->id, 'episode_id' => $episode->id, 'author_id' => $r->user()->id, 'previous_id' => $previous?->id, 'revision_number' => CarePlan::where('episode_id', $episode->id)->max('revision_number') + 1, 'revision_reason' => $d['revision_reason'] ?? null, 'content' => $previous?->content ?? [], 'request_id' => $r->request_id]);
             }Workspace::audit($r, 'clinical.'.$kind.'.draft_created', $p->organisation_id, 'patients', $p->id);
         });
@@ -283,6 +288,9 @@ class ClinicalRecordController extends Controller
                 abort_unless($this->noteVisible($r, $p, $a), 403);
             }abort_unless($a->version === (int) $d['version'], 409, 'This record changed. Reload to reconcile your draft.');
             abort_unless($a->status === 'draft', 409, 'Signed content is immutable. Create an addendum or new plan version.');
+            if ($kind === 'plans') {
+                abort_if($a->episode->discharge()->exists(), 409, 'This episode has been discharged.');
+            }
             $changes = ['content' => $content, 'version' => $a->version + 1];
             if ($final) {
                 if ($kind === 'notes') {
@@ -330,6 +338,7 @@ class ClinicalRecordController extends Controller
             $this->allow($r, $p->fresh(), 'plans', 'approve');
             $plan = CarePlan::where('patient_id', $p->id)->lockForUpdate()->findOrFail($record);
             $episode = CareEpisode::lockForUpdate()->findOrFail($plan->episode_id);
+            abort_if($episode->discharge()->exists(), 409, 'This episode has been discharged.');
             abort_unless($plan->version === (int) $d['version'], 409);
             abort_unless(hash_equals($plan->content_hash ?? '', $plan->digest($plan->content)), 409, 'Content integrity check failed.');
             if ($d['action'] === 'approve') {
@@ -406,7 +415,18 @@ class ClinicalRecordController extends Controller
         $p = Patient::where('user_id', $r->user()->id)->findOrFail($id);
         $items = ClinicalPublication::where('patient_id', $id)->with(['note:id,original_id,status', 'plan:id,status,episode_id,revision_number'])->latest('published_at')->get()->map(fn ($v) => ['id' => 'clinical-'.$v->id, 'kind' => $v->clinical_note_id ? 'notes' : 'plans', 'record_id' => $v->clinical_note_id ?? $v->care_plan_id, 'original_id' => $v->note?->original_id, 'status' => $v->clinical_note_id ? 'signed' : $v->plan?->status, 'revision_number' => $v->plan?->revision_number, 'content' => $v->content, 'published_at' => $v->published_at]);
         $resultItems = InvestigationPublication::where('patient_id', $id)->whereNotIn('investigation_result_id', InvestigationResult::whereNotNull('supersedes_id')->pluck('supersedes_id'))->with('result.investigation')->get()->map(fn ($v) => ['id' => 'result-'.$v->id, 'kind' => 'results', 'record_id' => $v->investigation_result_id, 'original_id' => null, 'status' => $v->result?->status, 'revision_number' => null, 'result_name' => $v->result?->investigation?->details['name'], 'content' => $v->content, 'published_at' => $v->published_at]);
-        $items = $items->concat($resultItems)->sortByDesc('published_at')->values();
+        $discharges = CareEpisode::where('patient_id', $id)->whereHas('discharge')->with('discharge')->get()
+            ->map(fn ($episode) => [
+                'id' => 'discharge-'.$episode->discharge->id,
+                'kind' => 'discharge',
+                'record_id' => $episode->id,
+                'original_id' => null,
+                'revision_number' => null,
+                'status' => 'discharged',
+                'content' => collect($episode->discharge->content)->only(['summary', 'next_steps'])->all(),
+                'published_at' => $episode->discharge->signed_at,
+            ]);
+        $items = $items->concat($resultItems)->concat($discharges)->sortByDesc('published_at')->values();
         Workspace::audit($r, 'clinical.patient_publications.viewed', $p->organisation_id, 'patients', $id);
 
         return Inertia::render('clinical/portal', ['patient' => $p->only(['id', 'name', 'reference']), 'items' => $items]);

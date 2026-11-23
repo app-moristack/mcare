@@ -49,6 +49,8 @@ export default function PublishedCare({
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             {v.kind === 'results' ? (
                                 <h2 className="font-semibold">Investigation result · {v.result_name}</h2>
+                            ) : v.kind === 'discharge' ? (
+                                <h2 className="font-semibold">Discharge summary</h2>
                             ) : (
                                 <h2 className="font-semibold">
                                     {v.kind === 'notes'

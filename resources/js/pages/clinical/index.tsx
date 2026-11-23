@@ -7,6 +7,7 @@ import { date, Errors, title } from '@/pages/patients/fields';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import ClinicalEditor, { ClinicalRow, ClinicalSchema } from './editor';
+import EpisodeDischarges, { type Episode } from './episode-discharges';
 type Permission = { read: boolean; write: boolean; publish: boolean; approve?: boolean };
 export default function ClinicalRecords({
     patient: p,
@@ -27,7 +28,7 @@ export default function ClinicalRecords({
     noteTypes: string[];
     rows: ClinicalRow[];
     schema: Record<string, ClinicalSchema>;
-    episodes: { id: number; title: string; current_plan_id: number | null }[];
+    episodes: Episode[];
     visits: { id: number; service: string; starts_at: string }[];
     referrals: { id: number; discipline: string }[];
     staff: { id: number; name: string }[];
@@ -112,6 +113,14 @@ export default function ClinicalRecords({
                         <Link href={manage ? '/workspace/patients' : '/my-visits'}>Back to {manage ? 'patients' : 'my visits'}</Link>
                     </Button>
                 </header>
+                {tab === 'plans' && !selected && permissions.plans.read && (
+                    <EpisodeDischarges
+                        base={base}
+                        episodes={episodes}
+                        plans={rows.filter((row) => row.kind === 'plans')}
+                        canSign={!!permissions.plans.approve}
+                    />
+                )}
                 {!selected && (
                     <div className="flex flex-wrap items-center justify-between gap-3">
                         <nav aria-label="Clinical record type" className="flex flex-wrap gap-2">
@@ -305,11 +314,13 @@ export default function ClinicalRecords({
                                         onChange={(e) => create.setData('episode_id', e.target.value)}
                                     >
                                         <option value="">Create new care episode</option>
-                                        {episodes.map((ep) => (
-                                            <option value={ep.id} key={ep.id}>
-                                                {ep.title}
-                                            </option>
-                                        ))}
+                                        {episodes
+                                            .filter((episode) => !episode.discharged_at)
+                                            .map((ep) => (
+                                                <option value={ep.id} key={ep.id}>
+                                                    {ep.title}
+                                                </option>
+                                            ))}
                                     </select>
                                     {!create.data.episode_id && (
                                         <>

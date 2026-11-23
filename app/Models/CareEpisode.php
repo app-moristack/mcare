@@ -13,6 +13,11 @@ class CareEpisode extends Model
         return [];
     }
 
+    public function discharge()
+    {
+        return $this->hasOne(EpisodeDischarge::class);
+    }
+
     public function patient()
     {
         return $this->belongsTo(Patient::class);
