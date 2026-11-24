@@ -10,6 +10,7 @@ use App\Models\CarePlan;
 use App\Models\CareTask;
 use App\Models\ClinicalObservation;
 use App\Models\DocumentExport;
+use App\Models\EpisodeHandover;
 use App\Models\Investigation;
 use App\Models\InvestigationPublication;
 use App\Models\InvestigationResult;
@@ -379,6 +380,29 @@ class DemoDataSeeder extends Seeder
                 $dischargePlan->update(['content_hash' => $dischargePlan->digest($dischargePlan->content)]);
             }
             $this->call(ClinicalRecordDemoSeeder::class);
+            $handoverEpisode = CareEpisode::where('patient_id', $patients[0]->id)->firstOrFail();
+            foreach (['nurse', 'lead'] as $key) {
+                foreach (['handover.read', 'handover.write', 'handover.acknowledge'] as $scope) {
+                    PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('handover-'.$key.'-'.$scope)], [
+                        'patient_id' => $patients[0]->id, 'user_id' => $users[$key]->id,
+                        'kind' => 'grant', 'scope' => $scope, 'purpose' => 'Synthetic episode handover demonstration',
+                        'authority_type' => 'patient_consent', 'evidence' => 'Synthetic authority only.',
+                        'wording_version' => 'DEMO-v1', 'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(),
+                        'recorded_by' => $admin->id,
+                    ]);
+                }
+            }
+            EpisodeHandover::firstOrCreate(['request_id' => $this->uuid('sbar-handover'), 'care_episode_id' => $handoverEpisode->id, 'sender_id' => $users['lead']->id], [
+                'recipient_id' => $users['nurse']->id,
+                'content' => [
+                    'situation' => 'SYNTHETIC handover for a demo episode.',
+                    'background' => 'Synthetic background for workflow practice only.',
+                    'assessment' => 'Synthetic assessment; no actual clinical finding.',
+                    'recommendation' => 'Acknowledge and review the synthetic care-plan information.',
+                ],
+                'priority' => 'routine',
+                'due_at' => now()->addDay(),
+            ]);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {
                 DB::table('audit_events')->insert(['organisation_id' => $org->id, 'actor_id' => $admin->id, 'event' => 'demo.seeded', 'created_at' => now()]);

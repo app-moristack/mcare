@@ -13,6 +13,7 @@ use App\Models\InvestigationResult;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\Referral;
+use App\Services\EpisodeHandovers;
 use App\Services\PatientAccess;
 use App\Services\Workspace;
 use Carbon\CarbonImmutable;
@@ -124,7 +125,7 @@ class ClinicalRecordController extends Controller
             }
         }
 
-        return Inertia::render('clinical/index', ['patient' => $p->only(['id', 'name', 'reference']), 'manage' => $manage, 'permissions' => $permissions, 'noteTypes' => $types, 'rows' => array_merge($notes->all(), $plans->all()), 'schema' => config('clinical.forms'), 'episodes' => CareEpisode::where('patient_id', $id)->with('discharge')->get(['id', 'title', 'current_plan_id'])->map(fn ($episode) => [
+        return Inertia::render('clinical/index', ['patient' => $p->only(['id', 'name', 'reference']), 'manage' => $manage, 'permissions' => $permissions, 'noteTypes' => $types, 'rows' => array_merge($notes->all(), $plans->all()), 'schema' => config('clinical.forms'), 'handover' => EpisodeHandovers::forClinicalPage($r, $p), 'episodes' => CareEpisode::where('patient_id', $id)->with('discharge')->get(['id', 'title', 'current_plan_id'])->map(fn ($episode) => [
             ...$episode->only(['id', 'title', 'current_plan_id']),
             'discharged_at' => $episode->discharge?->signed_at,
             'discharge' => $permissions['plans']['read'] ? $episode->discharge?->only(['signed_by', 'content', 'signed_at']) : null,

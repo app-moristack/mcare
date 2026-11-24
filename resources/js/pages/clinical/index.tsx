@@ -4,10 +4,11 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { date, Errors, title } from '@/pages/patients/fields';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import ClinicalEditor, { ClinicalRow, ClinicalSchema } from './editor';
 import EpisodeDischarges, { type Episode } from './episode-discharges';
+import EpisodeHandovers, { type HandoverData } from './episode-handovers';
 type Permission = { read: boolean; write: boolean; publish: boolean; approve?: boolean };
 export default function ClinicalRecords({
     patient: p,
@@ -21,6 +22,7 @@ export default function ClinicalRecords({
     referrals,
     staff,
     reviewBackups,
+    handover,
 }: {
     patient: { id: number; name: string; reference: string };
     manage: boolean;
@@ -29,13 +31,16 @@ export default function ClinicalRecords({
     rows: ClinicalRow[];
     schema: Record<string, ClinicalSchema>;
     episodes: Episode[];
+    handover?: HandoverData | null;
     visits: { id: number; service: string; starts_at: string }[];
     referrals: { id: number; discipline: string }[];
     staff: { id: number; name: string }[];
     reviewBackups: { id: number; name: string }[];
 }) {
     const base = `/patient-records/${p.id}/clinical`;
-    const [tab, setTab] = useState<'notes' | 'plans'>(manage || permissions.notes.read ? 'notes' : 'plans'),
+    const { url } = usePage();
+    const openHandover = handover && new URLSearchParams(url.split('?')[1]).get('tab') === 'handover';
+    const [tab, setTab] = useState<'notes' | 'plans'>(openHandover || (!manage && !permissions.notes.read) ? 'plans' : 'notes'),
         [active, setActive] = useState<number | null>(null),
         [creating, setCreating] = useState(false),
         [dialog, setDialog] = useState<{ record: ClinicalRow; action: string } | null>(null);
@@ -143,6 +148,7 @@ export default function ClinicalRecords({
                         {permissions[tab].write && <Button onClick={() => openCreate()}>New {tab === 'notes' ? 'note' : 'care plan'}</Button>}
                     </div>
                 )}
+                {tab === 'plans' && !selected && handover && <EpisodeHandovers base={base} episodes={episodes} handover={handover} />}
                 {selected?.content ? (
                     <ClinicalEditor
                         key={`${selected.kind}-${selected.id}`}
@@ -152,7 +158,7 @@ export default function ClinicalRecords({
                         staff={staff}
                         close={() => {
                             setActive(null);
-                            router.reload({ only: ['rows', 'episodes', 'permissions', 'noteTypes'] });
+                            router.reload({ only: ['rows', 'episodes', 'permissions', 'noteTypes', 'handover'] });
                         }}
                     />
                 ) : (

@@ -44,7 +44,8 @@ Source: MauriCare Complete Application Specification v1.0, 2 November 2026. Docu
 - Demo seed data includes signed/addendum/draft notes, a physiotherapy visit, superseded/active/review/draft plan versions, review tasks, lifecycle events and patient publications. Global search includes accessible record metadata and patient publications without indexing private clinical narratives.
 - Structured observation sets are visit-bound, password-signed, encrypted and immutable. Corrections append a linked replacement while retaining the original. Separate category grants, current assignment/credential checks, tenant isolation and patient blocks are enforced on every request. Effective values are charted per measurement without inferred ranges, scores, alerts or clinical interpretation; superseded values remain visible in the retained-record table but are excluded from trends.
 - The seeded administrator now defaults to its sole owner organisation when no context is selected, so adding the optional demo workspace does not hide admin menus. Explicit selections and tenant boundaries remain enforced.
-- SBAR handover/acknowledgement, carer-specific observation templates, supervised-note co-sign policy, plan rejection/withdrawal workflows, patient goal logs and formal records-access review remain pending. Existing nursing assessment co-signing remains separate.
+- Named clinical handovers record encrypted SBAR content, priority and a local deadline, with a generic in-app notice and password-confirmed acknowledgement by the recipient. Clinical escalation for non-response and transfer of task or result ownership remain pending.
+- Carer-specific observation templates, supervised-note co-sign policy, plan rejection/withdrawal workflows, patient goal logs and formal records-access review remain pending. Existing nursing assessment co-signing remains separate.
 
 ## Medication safety increment
 
@@ -100,4 +101,4 @@ Estimated **51% of the full specification**, and approximately **68% of the core
 
 Largest remaining packages: approved risk instruments and prescribing authority; credential vault/passport extraction; episode/discharge workflows; SOPs/quality/emergency staffing; quotes/refunds/claims/payouts; secure recovery/proxy workflows; approved questionnaires, accessibility/languages, external result adapters, production scheduler/monitoring and backup/restore acceptance. Later-phase video, partner integrations, devices and validated AI also remain.
 
-The next development priority is accountable clinical handover and transfer. Approved instrument content, thresholds and prescribing authority remain blocked on explicit clinical approval rather than being inferred from generic forms.
+The next development priority is accepted clinical transfer of outstanding work and expiry of episode-scoped access. Approved instrument content, thresholds and prescribing authority remain blocked on explicit clinical approval rather than being inferred from generic forms.

@@ -8,6 +8,7 @@ use App\Http\Controllers\ClinicalRecordController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentVaultController;
 use App\Http\Controllers\EpisodeDischargeController;
+use App\Http\Controllers\EpisodeHandoverController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\InvestigationController;
 use App\Http\Controllers\MedicationController;
@@ -53,6 +54,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::middleware(RequireWorkforceMfa::class)->group(function () {
         Route::get('/patient-records/{id}/clinical', [ClinicalRecordController::class, 'index'])->whereNumber('id');
         Route::post('/patient-records/{id}/clinical/episodes/{episode}/discharge', [EpisodeDischargeController::class, 'store'])->whereNumber(['id', 'episode']);
+        Route::post('/patient-records/{id}/clinical/episodes/{episode}/handovers', [EpisodeHandoverController::class, 'store'])->whereNumber(['id', 'episode']);
+        Route::post('/patient-records/{id}/clinical/episodes/{episode}/handovers/{handover}/acknowledge', [EpisodeHandoverController::class, 'acknowledge'])->whereNumber(['id', 'episode', 'handover']);
         Route::post('/patient-records/{id}/clinical/{kind}', [ClinicalRecordController::class, 'store'])->whereNumber('id');
         Route::patch('/patient-records/{id}/clinical/{kind}/{record}', [ClinicalRecordController::class, 'update'])->whereNumber(['id', 'record']);
         Route::post('/patient-records/{id}/clinical/plans/{record}/transition', [ClinicalRecordController::class, 'transition'])->whereNumber(['id', 'record']);
