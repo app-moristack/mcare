@@ -10,7 +10,7 @@ class EpisodeHandover extends Model
 
     protected function casts(): array
     {
-        return ['content' => 'encrypted:array', 'acknowledgement' => 'encrypted', 'acknowledged_at' => 'datetime', 'due_at' => 'datetime'];
+        return ['content' => 'encrypted:array', 'transfer_tasks' => 'encrypted:array', 'acknowledgement' => 'encrypted', 'acknowledged_at' => 'datetime', 'due_at' => 'datetime'];
     }
 
     public function episode()

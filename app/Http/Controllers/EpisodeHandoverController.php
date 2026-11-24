@@ -6,6 +6,7 @@ use App\Models\CareEpisode;
 use App\Models\EpisodeHandover;
 use App\Models\Patient;
 use App\Services\EpisodeHandovers;
+use App\Services\HandoverTaskTransfers;
 use App\Services\PatientAccess;
 use App\Services\Workspace;
 use Carbon\CarbonImmutable;
@@ -44,6 +45,10 @@ class EpisodeHandoverController extends Controller
             'recommendation' => 'required|string|max:4000',
             'priority' => 'required|in:routine,urgent',
             'due_at' => 'required|date_format:Y-m-d\TH:i',
+            'transfer_tasks' => 'sometimes|array|list|max:20',
+            'transfer_tasks.*' => 'required|array:id,version',
+            'transfer_tasks.*.id' => 'required|integer|min:1|distinct',
+            'transfer_tasks.*.version' => 'required|integer|min:1',
             'password' => 'required|current_password',
             'declaration' => 'accepted',
         ]);
@@ -56,12 +61,15 @@ class EpisodeHandoverController extends Controller
             $recipientId = (int) $data['recipient_id'];
             $content = Arr::only($data, ['situation', 'background', 'assessment', 'recommendation']);
             $dueAt = CarbonImmutable::createFromFormat('!Y-m-d\TH:i', $data['due_at'], config('mauricare.time_zone'))->utc();
+            $selection = collect($data['transfer_tasks'] ?? [])->map(fn (array $task) => ['id' => (int) $task['id'], 'version' => (int) $task['version']])
+                ->sortBy('id')->values()->all();
             $existing = EpisodeHandover::where('care_episode_id', $record->id)->where('sender_id', $sender)
                 ->where('request_id', $data['request_id'])->first();
             if ($existing) {
+                $existingSelection = collect($existing->transfer_tasks)->map(fn (array $task) => Arr::only($task, ['id', 'version']))->all();
                 abort_unless(
                     $existing->recipient_id === $recipientId && $existing->content === $content
-                        && $existing->priority === $data['priority'] && $existing->due_at->equalTo($dueAt),
+                        && $existing->priority === $data['priority'] && $existing->due_at->equalTo($dueAt) && $existingSelection === $selection,
                     409,
                     'This request already recorded a different handover.'
                 );
@@ -79,6 +87,15 @@ class EpisodeHandoverController extends Controller
                 throw ValidationException::withMessages(['recipient_id' => 'Choose a different assigned clinician who can read and acknowledge this handover.']);
             }
 
+            $transferTasks = [];
+            if ($selection !== []) {
+                if (! HandoverTaskTransfers::canAccept($recipient, $patient)) {
+                    throw ValidationException::withMessages(['recipient_id' => 'Choose a named clinician with task management permission to accept transferred tasks.']);
+                }
+                $transferTasks = HandoverTaskTransfers::lock($patient, $sender, $recipient, $selection)
+                    ->map(fn ($task) => $task->only(['id', 'version', 'title']))->all();
+            }
+
             $handover = EpisodeHandover::create([
                 'care_episode_id' => $record->id,
                 'sender_id' => $sender,
@@ -87,6 +104,7 @@ class EpisodeHandoverController extends Controller
                 'content' => $content,
                 'priority' => $data['priority'],
                 'due_at' => $dueAt,
+                'transfer_tasks' => $transferTasks,
             ]);
             DB::table('operation_notifications')->insert([
                 'organisation_id' => $patient->organisation_id,
@@ -120,10 +138,23 @@ class EpisodeHandoverController extends Controller
             $entry = EpisodeHandover::where('care_episode_id', $record->id)
                 ->where('recipient_id', $request->user()->id)->lockForUpdate()->findOrFail($handover);
 
+            if (! empty($entry->transfer_tasks)) {
+                $request->validate(['accept_transfer' => 'accepted']);
+            }
+
             if ($entry->acknowledged_at !== null) {
                 abort_unless($entry->acknowledgement === $data['acknowledgement'], 409, 'The recorded acknowledgement cannot be changed.');
 
                 return;
+            }
+
+            if (! empty($entry->transfer_tasks)) {
+                abort_unless(HandoverTaskTransfers::canAccept($request->user(), $patient), 403, 'Current task management permission is required to accept this transfer.');
+                if (! EpisodeHandovers::canRead($entry->sender, $patient) || ! PatientAccess::allowed($entry->sender, $patient, 'handover.write')) {
+                    throw ValidationException::withMessages(['transfer_tasks' => 'The sender no longer has authority for this transfer. Review the outstanding tasks.']);
+                }
+                $tasks = HandoverTaskTransfers::lock($patient, $entry->sender_id, $request->user(), $entry->transfer_tasks);
+                HandoverTaskTransfers::accept($request, $patient, $tasks);
             }
 
             $entry->update(['acknowledgement' => $data['acknowledgement'], 'acknowledged_at' => now()]);

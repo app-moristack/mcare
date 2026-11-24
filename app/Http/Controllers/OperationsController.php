@@ -178,7 +178,8 @@ class OperationsController extends Controller
         if ($module === 'tasks') {
             $data = $r->validate(['patient_id' => 'nullable|integer', 'title' => 'required|string|max:255', 'description' => 'required|string|max:5000', 'priority' => ['required', Rule::in(['routine', 'high', 'critical'])], 'owner_id' => 'required|integer', 'backup_id' => 'required|integer', 'due_at' => 'required|date']);
 
-            return [...$data, 'created_by' => $r->user()->id, 'due_at' => $this->date($data['due_at'])];
+            return [...$data, 'created_by' => $r->user()->id, 'due_at' => $this->date($data['due_at']),
+                'handover_transferable' => filled($data['patient_id'] ?? null) && $data['priority'] === 'routine'];
         }
         if ($module === 'appointments') {
             $data = $r->validate(['patient_id' => 'required|integer', 'referral_id' => 'required|integer', 'provider_id' => 'required|integer', 'missed_visit_case_id' => 'nullable|integer', 'service' => 'required|string|max:255', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at', 'location_type' => ['required', Rule::in(['home', 'clinic'])], 'location' => 'required|string|max:2000']);

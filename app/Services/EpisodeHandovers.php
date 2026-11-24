@@ -39,10 +39,15 @@ class EpisodeHandovers
                     ->select('user_id'))
                 ->orderBy('name')->get(['id', 'name', 'account_status', 'email_verified_at'])
                 ->filter(fn (User $candidate) => self::canAcknowledge($candidate, $patient))
-                ->map(fn (User $candidate) => $candidate->only(['id', 'name']))
+                ->map(fn (User $candidate) => [
+                    ...$candidate->only(['id', 'name']),
+                    'canAcceptTransfers' => HandoverTaskTransfers::canAccept($candidate, $patient),
+                ])
                 ->values()
             : [];
 
+        $transferTasks = $canCreate ? HandoverTaskTransfers::available($patient, $user->id)->orderBy('id')->get(['id', 'title', 'version']) : [];
+        $canAcceptTransfers = HandoverTaskTransfers::canAccept($user, $patient);
         $records = EpisodeHandover::whereHas('episode', fn ($query) => $query->where('patient_id', $patient->id))
             ->where(fn ($query) => $query->where('sender_id', $user->id)->orWhere('recipient_id', $user->id))
             ->with(['sender:id,name', 'recipient:id,name'])
@@ -57,13 +62,15 @@ class EpisodeHandovers
                 'created_at' => $record->created_at,
                 'acknowledged_at' => $record->acknowledged_at,
                 'acknowledgement' => $record->acknowledgement,
-                'canAcknowledge' => $canAcknowledge && $record->recipient_id === $user->id && $record->acknowledged_at === null,
+                'transfer_tasks' => collect($record->transfer_tasks)->map(fn (array $task) => ['id' => $task['id'], 'title' => $task['title']])->all(),
+                'canAcknowledge' => $canAcknowledge && $record->recipient_id === $user->id && $record->acknowledged_at === null
+                    && (empty($record->transfer_tasks) || $canAcceptTransfers),
             ]);
 
         if ($records->isNotEmpty()) {
             Workspace::audit($request, 'clinical.handover.viewed', $patient->organisation_id, 'patients', $patient->id);
         }
 
-        return ['canCreate' => $canCreate, 'recipients' => $recipients, 'records' => $records];
+        return ['canCreate' => $canCreate, 'recipients' => $recipients, 'records' => $records, 'transferTasks' => $transferTasks];
     }
 }

@@ -51,3 +51,4 @@ Use the nurse account to open **My visits → Notes and care plans**, autosave a
 
 - For discharge testing, sign in as the demo clinical lead and open Notes and care plans → Care plans for **Demo Discharge Patient**. The episode has a completed plan and is ready to sign. Use only synthetic text in the review and patient-facing summary.
 - For clinical handover testing, open **Demo Aline Patient** → Notes and care plans → Care plans. The clinical lead and nurse can see the synthetic handover. Sign in as the demo nurse to acknowledge it.
+- For task transfer testing, sign in as the demo nurse and send a new clinical handover for Demo Aline Patient to the demo clinical lead. Select the synthetic routine transfer task. The lead signs the acknowledgement and explicitly accepts ownership.

@@ -403,6 +403,18 @@ class DemoDataSeeder extends Seeder
                 'priority' => 'routine',
                 'due_at' => now()->addDay(),
             ]);
+            CareTask::firstOrCreate(['organisation_id' => $org->id, 'request_id' => $this->uuid('handover-transfer-task')], [
+                'patient_id' => $patients[0]->id,
+                'title' => 'Demo handover coordination task',
+                'description' => 'Synthetic task: review a demo care coordination checklist.',
+                'priority' => 'routine',
+                'status' => 'new',
+                'owner_id' => $users['nurse']->id,
+                'backup_id' => $users['coordinator']->id,
+                'created_by' => $users['coordinator']->id,
+                'due_at' => now()->addDays(2),
+                'handover_transferable' => true,
+            ]);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {
                 DB::table('audit_events')->insert(['organisation_id' => $org->id, 'actor_id' => $admin->id, 'event' => 'demo.seeded', 'created_at' => now()]);

@@ -3,7 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\CareEpisode;
+use App\Models\CareTask;
 use App\Models\EpisodeHandover;
+use App\Models\InvestigationResult;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\User;
@@ -69,7 +71,7 @@ class EpisodeHandoverTest extends TestCase
     {
         $data = $this->payload();
         $this->inWorkspace($this->lead)->get($this->clinicalPage)
-            ->assertInertia(fn (Assert $page) => $page->where('handover.recipients', [$this->nurse->only(['id', 'name'])]));
+            ->assertInertia(fn (Assert $page) => $page->where('handover.recipients', [[...$this->nurse->only(['id', 'name']), 'canAcceptTransfers' => false]]));
         $this->post($this->handovers, $data)->assertSessionHasNoErrors();
         $this->post($this->handovers, $data)->assertSessionHasNoErrors();
         $this->postJson($this->handovers, [...$data, 'situation' => 'A different situation'])->assertConflict();
@@ -143,5 +145,149 @@ class EpisodeHandoverTest extends TestCase
         $this->actingAs(User::findOrFail($this->patient->user_id))->get('/my-care/patients/'.$this->patient->id.'/clinical')
             ->assertInertia(fn (Assert $page) => $page->missing('handover'))
             ->assertDontSee('SYNTHETIC handover for a demo episode.');
+    }
+
+    public function test_transfer_is_signed_by_both_sides_and_moves_ownership_only_after_explicit_acceptance(): void
+    {
+        $task = CareTask::where('title', 'Demo handover coordination task')->firstOrFail();
+        $task->update(['due_at' => now()->subHour(), 'escalated_at' => now()->subMinutes(30)]);
+        $initialVersion = $task->version;
+        $oldAlert = 'overdue:'.$task->id.':'.$initialVersion.':'.$this->nurse->id;
+        DB::table('operation_notifications')->insert([
+            'organisation_id' => $task->organisation_id, 'user_id' => $this->nurse->id,
+            'message' => 'Synthetic overdue task alert.', 'url' => '/workspace/tasks',
+            'deduplication_key' => $oldAlert, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $data = $this->payload([
+            'recipient_id' => $this->lead->id,
+            'transfer_tasks' => [$task->only(['id', 'version'])],
+        ]);
+
+        $this->inWorkspace($this->nurse)->get($this->clinicalPage)
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('handover.transferTasks', [$task->only(['id', 'title', 'version'])])
+                ->where('handover.recipients', [[...$this->lead->only(['id', 'name']), 'canAcceptTransfers' => true]]));
+        $this->post($this->handovers, $data)->assertSessionHasNoErrors();
+        $this->post($this->handovers, $data)->assertSessionHasNoErrors();
+        $this->postJson($this->handovers, [...$data, 'transfer_tasks' => []])->assertConflict();
+        $entry = EpisodeHandover::where('request_id', $data['request_id'])->firstOrFail();
+        $this->assertSame($this->nurse->id, $task->fresh()->owner_id);
+        $this->assertSame($initialVersion, $task->fresh()->version);
+        $this->assertStringNotContainsString($task->title, $entry->getRawOriginal('transfer_tasks'));
+
+        $this->inWorkspace($this->lead)->get($this->clinicalPage)
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('handover.records.0.transfer_tasks', [$task->only(['id', 'title'])])
+                ->where('handover.records.0.canAcknowledge', true));
+        $url = $this->handovers.'/'.$entry->id.'/acknowledge';
+        $ack = ['acknowledgement' => 'I acknowledge the synthetic handover and take ownership.', 'password' => DemoDataSeeder::PASSWORD, 'declaration' => true];
+        $this->postJson($url, $ack)->assertUnprocessable()->assertJsonValidationErrors('accept_transfer');
+        $this->assertSame($this->nurse->id, $task->fresh()->owner_id);
+        $this->post($url, [...$ack, 'accept_transfer' => true])->assertSessionHasNoErrors();
+        $this->post($url, [...$ack, 'accept_transfer' => true])->assertSessionHasNoErrors();
+        $changed = $task->fresh();
+        $this->assertSame($this->lead->id, $changed->owner_id);
+        $this->assertSame($initialVersion + 1, $changed->version);
+        $this->assertEquals($task->only(['backup_id', 'due_at', 'status', 'description']), $changed->only(['backup_id', 'due_at', 'status', 'description']));
+        $this->assertNull($changed->escalated_at);
+        $this->assertNotNull($entry->fresh()->acknowledged_at);
+        $this->assertNotNull(DB::table('operation_notifications')->where('deduplication_key', $oldAlert)->value('read_at'));
+        $this->assertSame(1, DB::table('audit_events')->where('event', 'clinical.handover.task_transferred')->where('resource_id', $task->id)->where('actor_id', $this->lead->id)->count());
+
+        $this->artisan('mauricare:escalate-tasks')->assertSuccessful();
+        $this->assertDatabaseHas('operation_notifications', [
+            'deduplication_key' => 'overdue:'.$task->id.':'.$changed->version.':'.$this->lead->id, 'user_id' => $this->lead->id, 'read_at' => null,
+        ]);
+        $this->assertDatabaseMissing('operation_notifications', [
+            'deduplication_key' => 'overdue:'.$task->id.':'.$changed->version.':'.$this->nurse->id,
+        ]);
+    }
+
+    public function test_ineligible_or_changed_tasks_cannot_be_transferred_and_apply_atomically(): void
+    {
+        $task = CareTask::where('title', 'Demo handover coordination task')->firstOrFail();
+        $derived = CareTask::whereKey(InvestigationResult::firstOrFail()->task_id)->firstOrFail();
+        $derived->update(['owner_id' => $this->nurse->id]);
+        $data = $this->payload(['recipient_id' => $this->lead->id, 'transfer_tasks' => [$derived->only(['id', 'version'])]]);
+        $this->inWorkspace($this->nurse)->postJson($this->handovers, $data)->assertUnprocessable()->assertJsonValidationErrors('transfer_tasks');
+
+        $alternative = $task->replicate();
+        $alternative->fill(['request_id' => Str::uuid()->toString(), 'title' => 'Synthetic additional task', 'backup_id' => $this->lead->id])->save();
+        $data['transfer_tasks'] = [$alternative->only(['id', 'version'])];
+        $this->postJson($this->handovers, $data)->assertUnprocessable()->assertJsonValidationErrors('transfer_tasks');
+        $alternative->update(['backup_id' => $task->backup_id]);
+
+        $data['transfer_tasks'] = [$task->only(['id', 'version']), $alternative->only(['id', 'version'])];
+        $this->post($this->handovers, $data)->assertSessionHasNoErrors();
+        $entry = EpisodeHandover::where('request_id', $data['request_id'])->firstOrFail();
+        $alternative->increment('version');
+        $ack = ['acknowledgement' => 'Synthetic transfer acceptance.', 'password' => DemoDataSeeder::PASSWORD, 'declaration' => true, 'accept_transfer' => true];
+        $this->inWorkspace($this->lead)->postJson($this->handovers.'/'.$entry->id.'/acknowledge', $ack)
+            ->assertUnprocessable()->assertJsonValidationErrors('transfer_tasks');
+        $this->assertNull($entry->fresh()->acknowledged_at);
+        $this->assertSame($this->nurse->id, $task->fresh()->owner_id);
+        $this->assertSame($task->version, $task->fresh()->version);
+        $this->assertSame($this->nurse->id, $alternative->fresh()->owner_id);
+    }
+
+    public function test_task_management_authority_is_rechecked_at_send_and_acceptance(): void
+    {
+        $task = CareTask::where('title', 'Demo handover coordination task')->firstOrFail();
+        $task->update(['owner_id' => $this->lead->id]);
+        $data = $this->payload(['transfer_tasks' => [$task->only(['id', 'version'])]]);
+        $this->inWorkspace($this->lead)->postJson($this->handovers, $data)->assertUnprocessable()->assertJsonValidationErrors('recipient_id');
+
+        $task->update(['owner_id' => $this->nurse->id]);
+        $data['recipient_id'] = $this->lead->id;
+        $this->inWorkspace($this->nurse)->post($this->handovers, $data)->assertSessionHasNoErrors();
+        $entry = EpisodeHandover::where('request_id', $data['request_id'])->firstOrFail();
+        config(['permissions.grants.clinical_admin' => array_values(array_diff(config('permissions.grants.clinical_admin'), ['tasks.manage']))]);
+        $ack = ['acknowledgement' => 'Attempt to accept without task authority.', 'password' => DemoDataSeeder::PASSWORD, 'declaration' => true, 'accept_transfer' => true];
+        $this->inWorkspace($this->lead)->postJson($this->handovers.'/'.$entry->id.'/acknowledge', $ack)->assertForbidden();
+        $this->assertNull($entry->fresh()->acknowledged_at);
+        $this->assertSame($this->nurse->id, $task->fresh()->owner_id);
+    }
+
+    public function test_transfer_provenance_is_assigned_by_ordinary_task_creation(): void
+    {
+        $task = CareTask::where('title', 'Demo handover coordination task')->firstOrFail();
+        $data = [
+            'request_id' => Str::uuid()->toString(), 'patient_id' => $task->patient_id, 'title' => 'Synthetic ordinary task',
+            'description' => 'Synthetic coordination work.', 'priority' => 'routine', 'owner_id' => $task->owner_id,
+            'backup_id' => $task->backup_id, 'due_at' => now()->addDay()->toDateTimeString(),
+        ];
+        $this->inWorkspace($this->lead)->post('/workspace/tasks', $data)->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('care_tasks', ['request_id' => $data['request_id'], 'handover_transferable' => true]);
+
+        $data['request_id'] = Str::uuid()->toString();
+        $this->post('/workspace/tasks', [...$data, 'priority' => 'critical', 'handover_transferable' => true])->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('care_tasks', ['request_id' => $data['request_id'], 'handover_transferable' => false]);
+    }
+
+    public function test_migration_backfills_only_patient_linked_routine_tasks_with_matching_creation_audit(): void
+    {
+        $ordinary = CareTask::where('title', 'Demo handover coordination task')->firstOrFail();
+        $unknown = $ordinary->replicate();
+        $unknown->fill(['request_id' => Str::uuid()->toString(), 'title' => 'Synthetic unknown provenance'])->save();
+        $critical = $ordinary->replicate();
+        $critical->fill(['request_id' => Str::uuid()->toString(), 'priority' => 'critical'])->save();
+        foreach ([$ordinary, $unknown, $critical] as $task) {
+            DB::table('audit_events')->insert([
+                'actor_id' => $this->lead->id,
+                'organisation_id' => $task->id === $unknown->id ? null : $task->organisation_id,
+                'event' => 'tasks.created',
+                'resource_type' => 'tasks',
+                'resource_id' => $task->id,
+                'created_at' => now(),
+            ]);
+        }
+
+        $migration = require database_path('migrations/2026_11_24_000001_add_handover_task_transfers.php');
+        $migration->down();
+        $migration->up();
+
+        $this->assertDatabaseHas('care_tasks', ['id' => $ordinary->id, 'handover_transferable' => true]);
+        $this->assertDatabaseHas('care_tasks', ['id' => $unknown->id, 'handover_transferable' => false]);
+        $this->assertDatabaseHas('care_tasks', ['id' => $critical->id, 'handover_transferable' => false]);
     }
 }
