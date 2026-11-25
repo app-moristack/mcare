@@ -23,6 +23,7 @@ export default function ClinicalRecords({
     staff,
     reviewBackups,
     handover,
+    scopedPlanRead,
 }: {
     patient: { id: number; name: string; reference: string };
     manage: boolean;
@@ -32,6 +33,7 @@ export default function ClinicalRecords({
     schema: Record<string, ClinicalSchema>;
     episodes: Episode[];
     handover?: HandoverData | null;
+    scopedPlanRead?: boolean;
     visits: { id: number; service: string; starts_at: string }[];
     referrals: { id: number; discipline: string }[];
     staff: { id: number; name: string }[];
@@ -118,6 +120,12 @@ export default function ClinicalRecords({
                         <Link href={manage ? '/workspace/patients' : '/my-visits'}>Back to {manage ? 'patients' : 'my visits'}</Link>
                     </Button>
                 </header>
+                {tab === 'plans' && scopedPlanRead && (
+                    <p className="surface text-muted-foreground p-4 text-sm">
+                        Your care-plan access is read-only and limited to the episodes shown. Each episode grant ends at discharge or on its expiry
+                        date, whichever comes first.
+                    </p>
+                )}
                 {tab === 'plans' && !selected && permissions.plans.read && (
                     <EpisodeDischarges
                         base={base}
@@ -158,7 +166,7 @@ export default function ClinicalRecords({
                         staff={staff}
                         close={() => {
                             setActive(null);
-                            router.reload({ only: ['rows', 'episodes', 'permissions', 'noteTypes', 'handover'] });
+                            router.reload({ only: ['rows', 'episodes', 'permissions', 'noteTypes', 'handover', 'scopedPlanRead'] });
                         }}
                     />
                 ) : (

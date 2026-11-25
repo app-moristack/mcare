@@ -5,7 +5,7 @@ import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import Collections from './collections';
 import { AccessRule, date, Errors, Field, Fields, History, Schema, title } from './fields';
-import AccessRules from './rules';
+import AccessRules, { type GrantEpisode } from './rules';
 import ClinicalSummary from './summary';
 type Patient = {
     id: number;
@@ -32,6 +32,7 @@ export default function PatientRecord({
     canReadInvestigations,
     canReadDocuments,
     rules,
+    grantEpisodes,
     staff,
     history,
 }: {
@@ -45,6 +46,7 @@ export default function PatientRecord({
     canReadInvestigations: boolean;
     canReadDocuments: boolean;
     rules: AccessRule[];
+    grantEpisodes?: GrantEpisode[];
     staff: { id: number; name: string }[];
     history: History;
 }) {
@@ -204,7 +206,7 @@ export default function PatientRecord({
                             </p>
                         </section>
                     ))}
-                {tab === 'access' && manage && <AccessRules patientId={p.id} rules={rules} staff={staff} />}
+                {tab === 'access' && manage && <AccessRules patientId={p.id} rules={rules} staff={staff} grantEpisodes={grantEpisodes} />}
                 {tab === 'history' && manage && (
                     <section className="surface p-4 sm:p-6">
                         <h2 className="text-lg font-semibold">Recent access and changes</h2>

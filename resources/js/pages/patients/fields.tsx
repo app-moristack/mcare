@@ -117,6 +117,9 @@ export type AccessRule = {
     ends_at: string;
     revoked_at: string | null;
     revocation_reason: string | null;
+    episode_id?: number | null;
+    episode_title?: string | null;
+    episode_discharged_at?: string | null;
     user: { id: number; name: string };
 };
 export type History = { id: number; event: string; created_at: string; actor: string | null }[];

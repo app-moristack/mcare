@@ -2,14 +2,18 @@
 
 namespace App\Services;
 
+use App\Models\CareEpisode;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 
 class PatientAccess
 {
     public const SCOPES = ['summary.read', 'summary.write', 'basic.read', 'basic.write', 'nursing.read', 'nursing.write', 'nursing.cosign', 'observations.read', 'observations.write', 'medications.read', 'medications.reconcile', 'medications.verify', 'medications.administer', 'investigations.read', 'investigations.request', 'results.read', 'results.receive', 'results.acknowledge', 'results.publish', 'documents.identity.read', 'documents.clinical.read', 'documents.administrative.read', 'documents.upload', 'documents.review', 'documents.export', 'notes.read', 'notes.write', 'notes.publish', 'plans.read', 'plans.write', 'plans.approve', 'plans.publish', 'handover.read', 'handover.write', 'handover.acknowledge'];
+
+    public const EPISODE_GRANT_SCOPE = 'plans.read';
 
     public static function current(Patient $p, int $user)
     {
@@ -18,30 +22,46 @@ class PatientAccess
 
     public static function allowed(User $u, Patient $p, string $action): bool
     {
+        return self::grants($u, $p, $action)->whereNull('episode_id')->isNotEmpty();
+    }
+
+    public static function readablePlanEpisodeIds(User $user, Patient $patient): array
+    {
+        $episodeIds = self::grants($user, $patient, self::EPISODE_GRANT_SCOPE)->whereNotNull('episode_id')->pluck('episode_id');
+        if ($episodeIds->isEmpty()) {
+            return [];
+        }
+
+        return CareEpisode::where('patient_id', $patient->id)->whereKey($episodeIds->all())
+            ->whereDoesntHave('discharge')->pluck('id')->all();
+    }
+
+    private static function grants(User $u, Patient $p, string $action): Collection
+    {
         if (! in_array($action, self::SCOPES, true) || $p->user_id === $u->id || $u->account_status !== 'active' || ! $u->hasVerifiedEmail() || $p->status !== 'active') {
-            return false;
+            return new Collection;
         }
         $rules = self::current($p, $u->id)->get();
         if ($rules->contains('kind', 'block')) {
-            return false;
+            return new Collection;
         }
         $roles = Workspace::memberships($u)->where('organisation_id', $p->organisation_id)->pluck('role');
         $allowedRoles = match (true) {
             $action === 'notes.publish' || $action === 'plans.approve' || $action === 'plans.publish' || $action === 'results.publish' || $action === 'documents.review' => ['clinical_admin'], $action === 'nursing.write' || $action === 'medications.administer' => ['nurse'], $action === 'medications.verify' || $action === 'investigations.request' || $action === 'results.acknowledge' => ['doctor'], $action === 'nursing.cosign' => ['clinical_admin'], str_starts_with($action, 'nursing.') || str_starts_with($action, 'basic.') || str_starts_with($action, 'observations.') || str_starts_with($action, 'medications.') || str_starts_with($action, 'investigations.') || str_starts_with($action, 'results.') || str_starts_with($action, 'documents.') => ['doctor', 'nurse', 'clinical_admin'], default => ['doctor', 'nurse', 'physiotherapist', 'clinical_admin']
         };
-        $assignments = $rules->where('kind', 'assignment')->whereIn('role', $allowedRoles)->filter(fn ($a) => $roles->contains($a->role));
+        $assignments = $rules->where('kind', 'assignment')->whereNull('episode_id')->whereIn('role', $allowedRoles)->filter(fn ($a) => $roles->contains($a->role));
         if ($assignments->isEmpty()) {
-            return false;
+            return new Collection;
         }
         // Current credentials are required even for seeded administrators.
         $qualified = $assignments->contains(function ($a) use ($u, $p) {
             return $u->application()->where('organisation_id', $p->organisation_id)->where('status', 'approved')->whereIn('discipline', $a->role === 'clinical_admin' ? ['doctor', 'nurse'] : [$a->role])->whereDate('credential_expires_at', '>=', now(config('mauricare.time_zone'))->toDateString())->exists();
         });
         if (! $qualified) {
-            return false;
+            return new Collection;
         }
 
-        return $rules->where('kind', 'grant')->contains(fn ($g) => $g->scope === $action);
+        return $rules->where('kind', 'grant')->where('scope', $action);
     }
 
     public static function qualifiedRoles(User $u, Patient $p): array
@@ -49,7 +69,7 @@ class PatientAccess
         $roles = Workspace::memberships($u)->where('organisation_id', $p->organisation_id)->pluck('role');
         $discipline = $u->application()->where('organisation_id', $p->organisation_id)->where('status', 'approved')->whereDate('credential_expires_at', '>=', now(config('mauricare.time_zone'))->toDateString())->value('discipline');
 
-        return self::current($p, $u->id)->where('kind', 'assignment')->get()->filter(fn ($a) => $roles->contains($a->role) && in_array($discipline, $a->role === 'clinical_admin' ? ['doctor', 'nurse'] : [$a->role], true))->pluck('role')->unique()->values()->all();
+        return self::current($p, $u->id)->where('kind', 'assignment')->whereNull('episode_id')->get()->filter(fn ($a) => $roles->contains($a->role) && in_array($discipline, $a->role === 'clinical_admin' ? ['doctor', 'nurse'] : [$a->role], true))->pluck('role')->unique()->values()->all();
     }
 
     public static function enforce(Request $r, Patient $p, string $action): void

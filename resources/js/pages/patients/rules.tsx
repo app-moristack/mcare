@@ -34,16 +34,62 @@ const fields: Field[] = [
     { key: 'ends_at', label: 'Expires (Mauritius time)', type: 'datetime-local', choices: null, required: true },
     { key: 'evidence', label: 'Actual authority evidence / representative verification', type: 'textarea', choices: null, required: true },
 ];
-export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]; base: string; patient?: boolean }) {
+export type GrantEpisode = { id: number; title: string };
+
+function EpisodeGrantSelect({ episodes, value, onChange }: { episodes: GrantEpisode[]; value: string; onChange: (value: string) => void }) {
+    return (
+        <label className="block min-w-0 space-y-2 text-sm">
+            <span className="font-medium">Care episode scope</span>
+            <select className="w-full min-w-0" value={value} onChange={(event) => onChange(event.target.value)}>
+                <option value="">Patient-wide care plans</option>
+                {episodes.map((episode) => (
+                    <option key={episode.id} value={episode.id}>
+                        {episode.title}
+                    </option>
+                ))}
+            </select>
+            <span className="text-muted-foreground block text-xs">
+                A grant for one episode ends when that episode is discharged or the grant expires, whichever comes first.
+            </span>
+        </label>
+    );
+}
+
+function ruleStatus(rule: AccessRule) {
+    const discharge = rule.episode_discharged_at;
+    if (discharge && new Date(discharge) <= new Date(rule.ends_at) && (!rule.revoked_at || new Date(discharge) < new Date(rule.revoked_at))) {
+        return `Ended on discharge ${date(discharge)}`;
+    }
+
+    if (rule.revoked_at) return `Revoked ${date(rule.revoked_at)}`;
+    if (new Date(rule.ends_at) <= new Date()) return 'Expired';
+    if (new Date(rule.starts_at) > new Date()) return 'Scheduled';
+    return 'Current period';
+}
+
+export function RuleList({
+    rules,
+    base,
+    grantEpisodes = [],
+    patient = false,
+}: {
+    rules: AccessRule[];
+    base: string;
+    grantEpisodes?: GrantEpisode[];
+    patient?: boolean;
+}) {
     const f = useForm({ reason: '' });
     const [action, setAction] = useState<{
         url: string;
         label: string;
         user_id?: number;
         scope?: string;
+        episodeId?: string;
         ends_at?: string;
         request_id?: string;
     } | null>(null);
+    const selectedEpisode = grantEpisodes.find(({ id }) => String(id) === action?.episodeId);
+
     return (
         <div className="space-y-3">
             {rules.length === 0 && <p className="text-muted-foreground text-sm">No access rules recorded.</p>}
@@ -57,19 +103,13 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
                         {title(a.scope)}
                         {a.role ? ` · ${title(a.role)}` : ''}
                     </p>
+                    {a.episode_id && <p className="mt-1 text-sm font-medium break-words">Care episode · {a.episode_title ?? `#${a.episode_id}`}</p>}
                     <p className="text-muted-foreground mt-1 text-sm break-words">{a.purpose}</p>
                     <p className="text-muted-foreground mt-2 text-xs">
                         {date(a.starts_at)} to {date(a.ends_at)}
                     </p>
                     <p className="mt-1 text-xs">
-                        {a.revoked_at
-                            ? `Revoked ${date(a.revoked_at)}`
-                            : new Date(a.ends_at) < new Date()
-                              ? 'Expired'
-                              : new Date(a.starts_at) > new Date()
-                                ? 'Scheduled'
-                                : 'Current period'}{' '}
-                        · {title(a.authority_type)}
+                        {ruleStatus(a)}· {title(a.authority_type)}
                     </p>
                     {!a.revoked_at && (patient ? a.kind !== 'assignment' : a.kind !== 'block') && (
                         <Button
@@ -127,11 +167,11 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
                     if (!open) setAction(null);
                 }}
             >
-                <DialogContent>
+                <DialogContent className="max-h-[85dvh] w-[calc(100%-1.5rem)] overflow-y-auto sm:max-w-xl">
                     <DialogTitle>{action?.label}</DialogTitle>
-                    <DialogDescription>
+                    <DialogDescription className="break-words">
                         {action?.scope
-                            ? `I authorise this assigned professional for ${title(action.scope)} for their recorded care purpose until ${date(action.ends_at ?? null)}. Only this record category and action are authorised. Private nursing records remain restricted to the professional team. I can revoke this authority at any time. Existing blocks still apply.`
+                            ? `I authorise this assigned professional for ${title(action.scope)} ${selectedEpisode ? `for the care episode “${selectedEpisode.title}” until it is discharged or ${date(action.ends_at ?? null)}, whichever comes first` : `for their recorded care purpose until ${date(action.ends_at ?? null)}`}. Only this record category and action are authorised. Private nursing records remain restricted to the professional team. I can revoke this authority at any time. Existing blocks still apply.`
                             : 'This change takes effect immediately for future clinical summary requests.'}
                     </DialogDescription>
                     <form
@@ -143,6 +183,7 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
                                 ...d,
                                 ...(action.user_id ? { user_id: action.user_id } : {}),
                                 ...(action.scope ? { scope: action.scope, ends_at: action.ends_at, request_id: action.request_id } : {}),
+                                ...(action.scope === 'plans.read' && action.episodeId ? { episode_id: action.episodeId } : {}),
                             }));
                             f.post(action.url, {
                                 preserveScroll: true,
@@ -158,9 +199,9 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
                                 <label htmlFor="authority-scope">Record category and action</label>
                                 <select
                                     id="authority-scope"
-                                    className="w-full"
+                                    className="w-full min-w-0"
                                     value={action.scope}
-                                    onChange={(e) => setAction({ ...action, scope: e.target.value })}
+                                    onChange={(e) => setAction({ ...action, scope: e.target.value, episodeId: undefined })}
                                 >
                                     {[
                                         'summary.read',
@@ -206,6 +247,13 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
                                 </select>
                             </div>
                         )}
+                        {action?.scope === 'plans.read' && grantEpisodes.length > 0 && (
+                            <EpisodeGrantSelect
+                                episodes={grantEpisodes}
+                                value={action.episodeId ?? ''}
+                                onChange={(episodeId) => setAction({ ...action, episodeId })}
+                            />
+                        )}
                         <label htmlFor="access-reason">Reason *</label>
                         <textarea
                             id="access-reason"
@@ -229,12 +277,23 @@ export function RuleList({ rules, base, patient = false }: { rules: AccessRule[]
         </div>
     );
 }
-export default function AccessRules({ patientId, rules, staff }: { patientId: number; rules: AccessRule[]; staff: { id: number; name: string }[] }) {
+export default function AccessRules({
+    patientId,
+    rules,
+    staff,
+    grantEpisodes = [],
+}: {
+    patientId: number;
+    rules: AccessRule[];
+    staff: { id: number; name: string }[];
+    grantEpisodes?: GrantEpisode[];
+}) {
     const f = useForm({
         request_id: crypto.randomUUID(),
         user_id: '',
         kind: 'assignment',
         scope: 'all',
+        episode_id: '',
         role: '',
         purpose: '',
         authority_type: 'care_assignment',
@@ -290,11 +349,21 @@ export default function AccessRules({ patientId, rules, staff }: { patientId: nu
                                 ...f.data,
                                 kind: v,
                                 scope: v === 'grant' ? 'summary.read' : 'all',
+                                episode_id: '',
                                 authority_type: v === 'grant' ? 'patient_consent' : v === 'block' ? 'patient_block' : 'care_assignment',
                             });
+                        } else if (k === 'scope') {
+                            f.setData({ ...f.data, scope: v, episode_id: '' });
                         } else f.setData(k as 'purpose', v);
                     }}
                 />
+                {f.data.kind === 'grant' && f.data.scope === 'plans.read' && grantEpisodes.length > 0 && (
+                    <EpisodeGrantSelect
+                        episodes={grantEpisodes}
+                        value={f.data.episode_id}
+                        onChange={(episodeId) => f.setData('episode_id', episodeId)}
+                    />
+                )}
                 <label className="flex items-start gap-3 text-sm">
                     <input type="checkbox" required checked={f.data.attested} onChange={(e) => f.setData('attested', e.target.checked)} />
                     <span>I verified this actual authority and its evidence. A family relationship, payment or admin role alone is not consent.</span>

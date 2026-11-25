@@ -2,16 +2,18 @@ import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { AccessRule, date, History, title } from './fields';
-import { RuleList } from './rules';
+import { type GrantEpisode, RuleList } from './rules';
 import { Content, SummaryDisplay } from './summary';
 export default function PatientAccess({
     patient: p,
     rules,
+    grantEpisodes,
     history,
     summary,
 }: {
     patient: { id: number; name: string; reference: string };
     rules: AccessRule[];
+    grantEpisodes?: GrantEpisode[];
     history: History;
     summary: { content: Content; version: number; updated_at: string } | null;
 }) {
@@ -57,7 +59,7 @@ export default function PatientAccess({
                     </section>
                     <section className="surface space-y-5 p-4 sm:p-6">
                         <h2 className="text-lg font-semibold">Professionals and access rules</h2>
-                        <RuleList rules={rules} base={`/my-care/patients/${p.id}`} patient />
+                        <RuleList rules={rules} base={`/my-care/patients/${p.id}`} grantEpisodes={grantEpisodes} patient />
                     </section>
                 </div>
                 <section className="surface p-4 sm:p-6">

@@ -13,6 +13,11 @@ class PatientAccessRule extends Model
         return ['starts_at' => 'datetime', 'ends_at' => 'datetime', 'revoked_at' => 'datetime', 'evidence' => 'encrypted'];
     }
 
+    public function episode()
+    {
+        return $this->belongsTo(CareEpisode::class);
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class);

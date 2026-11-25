@@ -97,6 +97,7 @@ class GlobalSearchController extends Controller
             $add('Assessments', ucfirst($a->kind).' assessment #'.$a->id, $a->patient->name.' · '.$a->status, ($own ? '/my-care/patients/' : '/patient-records/').$a->patient_id.'/assessments');
         }
         if ($orgs->contains($org)) {
+            $scopedPlanEpisodes = [];
             foreach (['notes' => ClinicalNote::class, 'plans' => CarePlan::class] as $kind => $model) {
                 $query = $model::whereHas('patient', fn ($p) => $p->where('organisation_id', $org));
                 $query->where(function ($b) use ($kind, $like, $q) {
@@ -109,7 +110,12 @@ class GlobalSearchController extends Controller
                 });
                 foreach ($query->with('patient')->latest('id')->limit(12)->get() as $a) {
                     $operational = $can('patients.manage');
-                    if (! $operational && ! PatientAccess::allowed($u, $a->patient, $kind.'.read')) {
+                    $visible = $operational || PatientAccess::allowed($u, $a->patient, $kind.'.read');
+                    if (! $visible && $kind === 'plans') {
+                        $episodes = $scopedPlanEpisodes[$a->patient_id] ??= PatientAccess::readablePlanEpisodeIds($u, $a->patient);
+                        $visible = in_array($a->episode_id, $episodes, true);
+                    }
+                    if (! $visible) {
                         continue;
                     }
                     if (! $operational && $kind === 'notes' && $a->visibility === 'discipline_only' && ! array_intersect(PatientAccess::qualifiedRoles($u, $a->patient), [$a->discipline, 'clinical_admin'])) {

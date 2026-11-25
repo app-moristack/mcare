@@ -9,6 +9,7 @@ use App\Models\CareTask;
 use App\Models\EpisodeDischarge;
 use App\Models\InvestigationResult;
 use App\Models\Patient;
+use App\Models\PatientAccessRule;
 use App\Services\PatientAccess;
 use App\Services\Workspace;
 use Illuminate\Http\Request;
@@ -77,6 +78,15 @@ class EpisodeDischargeController extends Controller
                 'content_hash' => EpisodeDischarge::digest($record->id, $plan->id, $signer, $content),
                 'signed_at' => now(),
             ]);
+            $revoked = PatientAccessRule::where('patient_id', $patient->id)->where('episode_id', $record->id)
+                ->where('kind', 'grant')->whereNull('revoked_at')->update([
+                    'revoked_at' => $discharge->signed_at,
+                    'revoked_by' => $signer,
+                    'revocation_reason' => 'Care episode clinically discharged.',
+                ]);
+            if ($revoked > 0) {
+                Workspace::audit($request, 'patient.access.episode_grants.revoked', $patient->organisation_id, 'patients', $patient->id);
+            }
             Workspace::audit($request, 'clinical.episode.discharged', $patient->organisation_id, 'episode_discharges', $discharge->id);
         });
 

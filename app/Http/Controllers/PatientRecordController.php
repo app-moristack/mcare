@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\CareEpisode;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\PatientSummary;
@@ -82,6 +83,7 @@ class PatientRecordController extends Controller
             'patient' => [...$p->only(['id', 'name', 'reference', 'date_of_birth', 'phone', 'email', 'locality', 'address', 'status', 'version', 'identity_status']), 'demographics' => $manage ? $p->demographics : collect($p->demographics ?? [])->except(['insurance_policies', 'external_identifiers', 'payer_relationship', 'payer_details'])->all()],
             'schema' => config('patient'), 'manage' => $manage, 'canRead' => PatientAccess::allowed($r->user(), $p, 'summary.read'), 'canWrite' => PatientAccess::allowed($r->user(), $p, 'summary.write'), 'canReadObservations' => PatientAccess::allowed($r->user(), $p, 'observations.read'), 'canReadMedications' => PatientAccess::allowed($r->user(), $p, 'medications.read'), 'canReadInvestigations' => PatientAccess::allowed($r->user(), $p, 'investigations.read'), 'canReadDocuments' => collect(['identity', 'clinical', 'administrative'])->contains(fn ($category) => PatientAccess::allowed($r->user(), $p, 'documents.'.$category.'.read')),
             'rules' => $manage ? $this->rules($p) : [],
+            'grantEpisodes' => $manage ? $this->grantEpisodes($p) : [],
             'staff' => $manage ? Workspace::staff($p->organisation_id)->select('id', 'name')->orderBy('name')->get() : [],
             'history' => $manage ? $this->history($p) : [],
         ]);
@@ -89,7 +91,35 @@ class PatientRecordController extends Controller
 
     private function rules(Patient $p)
     {
-        return PatientAccessRule::where('patient_id', $p->id)->with('user:id,name')->latest()->get()->map(fn ($a) => [...$a->only(['id', 'kind', 'scope', 'role', 'purpose', 'starts_at', 'ends_at', 'revoked_at', 'revocation_reason', 'authority_type', 'wording_version']), 'user' => $a->user]);
+        return PatientAccessRule::where('patient_id', $p->id)->with([
+            'user:id,name',
+            'episode' => fn ($episode) => $episode->where('patient_id', $p->id)->select('id', 'title'),
+            'episode.discharge:id,care_episode_id,signed_at',
+        ])->latest()->get()->map(fn ($a) => [
+            ...$a->only(['id', 'kind', 'scope', 'role', 'purpose', 'starts_at', 'ends_at', 'revoked_at', 'revocation_reason', 'authority_type', 'wording_version', 'episode_id']),
+            'user' => $a->user,
+            'episode_title' => $a->episode?->title,
+            'episode_discharged_at' => $a->episode?->discharge?->signed_at,
+        ]);
+    }
+
+    private function grantEpisodes(Patient $patient)
+    {
+        return CareEpisode::where('patient_id', $patient->id)->whereDoesntHave('discharge')
+            ->orderBy('title')->get(['id', 'title']);
+    }
+
+    private function validateGrantEpisode(Patient $patient, array $rule): void
+    {
+        if (empty($rule['episode_id'])) {
+            return;
+        }
+        if (($rule['kind'] ?? 'grant') !== 'grant' || $rule['scope'] !== PatientAccess::EPISODE_GRANT_SCOPE) {
+            $this->fail('episode_id', 'An episode can only limit a care plan reading grant.');
+        }
+        if (! CareEpisode::where('patient_id', $patient->id)->whereKey($rule['episode_id'])->whereDoesntHave('discharge')->exists()) {
+            $this->fail('episode_id', 'Choose an open care episode for this patient.');
+        }
     }
 
     private function history(Patient $p)
@@ -207,7 +237,7 @@ class PatientRecordController extends Controller
     public function addRule(Request $r, int $id)
     {
         $p = $this->patient($r, $id, true);
-        $d = $r->validate(['request_id' => 'required|uuid', 'user_id' => 'required|integer', 'kind' => ['required', Rule::in(['assignment', 'grant', 'block'])], 'scope' => ['required', Rule::in([...PatientAccess::SCOPES, 'all'])], 'role' => ['nullable', Rule::in(['doctor', 'nurse', 'physiotherapist', 'carer', 'clinical_admin'])], 'purpose' => 'required|string|max:255', 'authority_type' => ['required', Rule::in(['patient_consent', 'verified_representative', 'care_assignment', 'patient_block'])], 'evidence' => 'required|string|max:3000', 'wording_version' => 'required|string|max:100', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at', 'attested' => 'accepted']);
+        $d = $r->validate(['request_id' => 'required|uuid', 'user_id' => 'required|integer', 'kind' => ['required', Rule::in(['assignment', 'grant', 'block'])], 'scope' => ['required', Rule::in([...PatientAccess::SCOPES, 'all'])], 'episode_id' => 'nullable|integer|min:1', 'role' => ['nullable', Rule::in(['doctor', 'nurse', 'physiotherapist', 'carer', 'clinical_admin'])], 'purpose' => 'required|string|max:255', 'authority_type' => ['required', Rule::in(['patient_consent', 'verified_representative', 'care_assignment', 'patient_block'])], 'evidence' => 'required|string|max:3000', 'wording_version' => 'required|string|max:100', 'starts_at' => 'required|date', 'ends_at' => 'required|date|after:starts_at', 'attested' => 'accepted']);
         abort_unless(Workspace::staff($p->organisation_id)->whereKey($d['user_id'])->exists(), 422, 'Choose an active member of this organisation.');
         if ($d['kind'] === 'assignment' && (empty($d['role']) || $d['scope'] !== 'all' || $d['authority_type'] !== 'care_assignment')) {
             $this->fail('role', 'Assignments require a clinical role, all scope and care assignment evidence.');
@@ -235,10 +265,11 @@ class PatientRecordController extends Controller
             Patient::whereKey($p->id)->lockForUpdate()->firstOrFail();
             $existing = PatientAccessRule::where('request_id', $d['request_id'])->first();
             if ($existing) {
-                abort_unless($existing->patient_id === $p->id, 409);
+                abort_unless($existing->patient_id === $p->id && (int) $existing->episode_id === (int) ($d['episode_id'] ?? 0), 409);
 
                 return;
             }
+            $this->validateGrantEpisode($p, $d);
             unset($d['attested']);
             PatientAccessRule::create([...$d, 'patient_id' => $p->id, 'starts_at' => $start, 'ends_at' => $end, 'recorded_by' => $r->user()->id]);
             Workspace::audit($r, 'patient.access.'.$d['kind'].'.recorded', $p->organisation_id, 'patients', $p->id);
@@ -278,7 +309,7 @@ class PatientRecordController extends Controller
         $p = Patient::where('user_id', $r->user()->id)->findOrFail($id);
         Workspace::audit($r, 'patient.own_record.viewed', $p->organisation_id, 'patients', $p->id);
 
-        return Inertia::render('patients/access', ['patient' => $p->only(['id', 'name', 'reference']), 'rules' => $this->rules($p), 'history' => $this->history($p), 'summary' => PatientSummary::where('patient_id', $id)->first()?->only(['content', 'version', 'updated_at'])]);
+        return Inertia::render('patients/access', ['patient' => $p->only(['id', 'name', 'reference']), 'rules' => $this->rules($p), 'grantEpisodes' => $this->grantEpisodes($p), 'history' => $this->history($p), 'summary' => PatientSummary::where('patient_id', $id)->first()?->only(['content', 'version', 'updated_at'])]);
     }
 
     public function ownRevoke(Request $r, int $id, int $rule)
@@ -292,18 +323,19 @@ class PatientRecordController extends Controller
     public function ownGrant(Request $r, int $id)
     {
         $p = Patient::where('user_id', $r->user()->id)->findOrFail($id);
-        $d = $r->validate(['user_id' => 'required|integer', 'request_id' => 'required|uuid', 'scope' => ['required', Rule::in(PatientAccess::SCOPES)], 'reason' => 'required|string|max:2000', 'ends_at' => 'required|date|after:now']);
+        $d = $r->validate(['user_id' => 'required|integer', 'request_id' => 'required|uuid', 'scope' => ['required', Rule::in(PatientAccess::SCOPES)], 'episode_id' => 'nullable|integer|min:1', 'reason' => 'required|string|max:2000', 'ends_at' => 'required|date|after:now']);
         DB::transaction(function () use ($p, $r, $d) {
             Patient::whereKey($p->id)->lockForUpdate()->firstOrFail();
             $existing = PatientAccessRule::where('request_id', $d['request_id'])->first();
             if ($existing) {
-                abort_unless($existing->patient_id === $p->id && $existing->recorded_by === $r->user()->id, 409);
+                abort_unless($existing->patient_id === $p->id && $existing->recorded_by === $r->user()->id && (int) $existing->episode_id === (int) ($d['episode_id'] ?? 0), 409);
 
                 return;
             }
+            $this->validateGrantEpisode($p, $d);
             $end = CarbonImmutable::parse($d['ends_at'], 'Indian/Mauritius')->utc();
             $assignment = PatientAccess::current($p, $d['user_id'])->where('kind', 'assignment')->where('ends_at', '>=', $end)->firstOrFail();
-            PatientAccessRule::create(['patient_id' => $p->id, 'user_id' => $d['user_id'], 'kind' => 'grant', 'scope' => $d['scope'], 'purpose' => $assignment->purpose, 'authority_type' => 'patient_consent', 'evidence' => 'Linked patient explicitly authorised '.$d['scope'].' for the specified record category. '.$d['reason'], 'wording_version' => 'patient-summary-authority-v1', 'starts_at' => now(), 'ends_at' => $end, 'recorded_by' => $r->user()->id, 'request_id' => $d['request_id']]);
+            PatientAccessRule::create(['patient_id' => $p->id, 'user_id' => $d['user_id'], 'kind' => 'grant', 'scope' => $d['scope'], 'episode_id' => $d['episode_id'] ?? null, 'purpose' => $assignment->purpose, 'authority_type' => 'patient_consent', 'evidence' => 'Linked patient explicitly authorised '.$d['scope'].' for the specified record category. '.$d['reason'], 'wording_version' => 'patient-summary-authority-v1', 'starts_at' => now(), 'ends_at' => $end, 'recorded_by' => $r->user()->id, 'request_id' => $d['request_id']]);
             Workspace::audit($r, 'patient.access.grant.recorded', $p->organisation_id, 'patients', $p->id);
         });
 

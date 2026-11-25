@@ -93,7 +93,7 @@ class DemoDataSeeder extends Seeder
             }
             $admin->memberships()->firstOrCreate(['organisation_id' => $org->id, 'role' => 'super_admin'], ['status' => 'active', 'approved_by' => $admin->id, 'starts_at' => now()->subDay(), 'approval_evidence' => 'Synthetic demo workspace administration only.']);
             $users = [];
-            foreach (['nurse' => ['Nadia Nurse', 'nurse'], 'doctor' => ['Dev Doctor', 'doctor'], 'lead' => ['Lea Clinical Lead', 'doctor'], 'physio' => ['Priya Physiotherapist', 'physiotherapist'], 'carer' => ['Chris Carer', 'carer'], 'coordinator' => ['Camille Coordinator', 'coordinator'], 'finance' => ['Farah Finance', 'finance']] as $key => [$name,$role]) {
+            foreach (['nurse' => ['Nadia Nurse', 'nurse'], 'doctor' => ['Dev Doctor', 'doctor'], 'lead' => ['Lea Clinical Lead', 'doctor'], 'physio' => ['Priya Physiotherapist', 'physiotherapist'], 'carer' => ['Chris Carer', 'carer'], 'coordinator' => ['Camille Coordinator', 'coordinator'], 'finance' => ['Farah Finance', 'finance'], 'episode-reader' => ['Episode Reader', 'nurse']] as $key => [$name,$role]) {
                 $u = $this->user('demo.'.$key, $name);
                 $users[$key] = $u;
                 $roles = $key === 'lead' ? ['doctor', 'clinical_admin'] : [$role];
@@ -379,6 +379,25 @@ class DemoDataSeeder extends Seeder
             if ($dischargePlan->wasRecentlyCreated) {
                 $dischargePlan->update(['content_hash' => $dischargePlan->digest($dischargePlan->content)]);
             }
+            $otherDischargeEpisode = CareEpisode::firstOrCreate(['request_id' => $this->uuid('discharge-separate-episode')], [
+                'patient_id' => $dischargePatient->id, 'title' => 'Demo separate episode private plan', 'created_by' => $users['nurse']->id,
+            ]);
+            CarePlan::firstOrCreate(['request_id' => $this->uuid('discharge-separate-plan')], [
+                'patient_id' => $dischargePatient->id, 'episode_id' => $otherDischargeEpisode->id, 'author_id' => $users['nurse']->id,
+                'revision_number' => 1, 'content' => ClinicalRecordDemoSeeder::planContent($users['nurse']->id), 'status' => 'draft',
+            ]);
+            $episodeAuthority = [
+                'patient_id' => $dischargePatient->id, 'user_id' => $users['episode-reader']->id,
+                'purpose' => 'Synthetic read-only care episode scope', 'evidence' => 'Synthetic consent only.',
+                'wording_version' => 'DEMO-v1', 'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(), 'recorded_by' => $admin->id,
+            ];
+            PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('discharge-reader-assignment')], [
+                ...$episodeAuthority, 'kind' => 'assignment', 'scope' => 'all', 'role' => 'nurse', 'authority_type' => 'care_assignment',
+            ]);
+            PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('discharge-reader-scoped-grant')], [
+                ...$episodeAuthority, 'kind' => 'grant', 'scope' => 'plans.read', 'episode_id' => $dischargeEpisode->id, 'authority_type' => 'patient_consent',
+            ]);
+
             $this->call(ClinicalRecordDemoSeeder::class);
             $handoverEpisode = CareEpisode::where('patient_id', $patients[0]->id)->firstOrFail();
             foreach (['nurse', 'doctor', 'lead'] as $key) {

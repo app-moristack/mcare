@@ -81,6 +81,9 @@ class ClinicalRecordController extends Controller
             $read = PatientAccess::allowed($r->user(), $p, $kind.'.read');
             $permissions[$kind] = ['read' => $read, 'write' => $read && PatientAccess::allowed($r->user(), $p, $kind.'.write'), 'publish' => $read && PatientAccess::allowed($r->user(), $p, $kind.'.publish')];
         }$permissions['plans']['approve'] = $permissions['plans']['read'] && PatientAccess::allowed($r->user(), $p, 'plans.approve');
+        $planEpisodeIds = $permissions['plans']['read'] ? [] : PatientAccess::readablePlanEpisodeIds($r->user(), $p);
+        $scopedPlanRead = $planEpisodeIds !== [];
+        $permissions['plans']['read'] = $permissions['plans']['read'] || $scopedPlanRead;
         $types = $this->noteTypes($r, $p);
         $permissions['notes']['write'] = $permissions['notes']['write'] && count($types) > 0;
         $manage = $r->user()->hasPermission('patients.manage', $p->organisation_id);
@@ -88,7 +91,11 @@ class ClinicalRecordController extends Controller
             Workspace::audit($r, 'clinical.access.denied', $p->organisation_id, 'patients', $id);
             abort(403);
         }
-        $notes = ClinicalNote::where('patient_id', $id)->with('author:id,name')->latest('id')->get()->map(function ($n) use ($r, $p, $permissions) {
+        $notes = (! $permissions['notes']['read'] && (! $manage || $scopedPlanRead)
+            ? collect()
+            : ClinicalNote::where('patient_id', $id)->with('author:id,name')->latest('id')->get())
+            ->filter(fn ($note) => ! $scopedPlanRead || $this->noteVisible($r, $p, $note))
+            ->map(function ($n) use ($r, $p, $permissions) {
             $visible = $this->noteVisible($r, $p, $n);
             $row = $n->only(['id', 'status', 'note_type', 'discipline', 'visibility', 'appointment_id', 'original_id', 'version', 'signed_at', 'signed_by', 'created_at']);
             $row['author'] = $n->author;
@@ -101,7 +108,11 @@ class ClinicalRecordController extends Controller
 
             return $row;
         });
-        $plans = CarePlan::where('patient_id', $id)->with(['author:id,name', 'episode:id,title,current_plan_id'])->latest('id')->get()->map(function ($v) use ($r, $permissions) {
+        $planMetadata = $manage || $permissions['plans']['read'];
+        $plans = ($planMetadata ? CarePlan::where('patient_id', $id)
+            ->when($scopedPlanRead, fn ($query) => $query->whereIn('episode_id', $planEpisodeIds)
+                ->whereHas('episode', fn ($episode) => $episode->whereDoesntHave('discharge')))
+            ->with(['author:id,name', 'episode:id,title,current_plan_id'])->latest('id')->get() : collect())->map(function ($v) use ($r, $permissions) {
             $row = $v->only(['id', 'episode_id', 'status', 'previous_id', 'revision_number', 'version', 'signed_at', 'approved_at', 'approved_by', 'review_due_at', 'review_task_id', 'created_at']);
             $row['kind'] = 'plans';
             $row['author'] = $v->author;
@@ -125,11 +136,13 @@ class ClinicalRecordController extends Controller
             }
         }
 
-        return Inertia::render('clinical/index', ['patient' => $p->only(['id', 'name', 'reference']), 'manage' => $manage, 'permissions' => $permissions, 'noteTypes' => $types, 'rows' => array_merge($notes->all(), $plans->all()), 'schema' => config('clinical.forms'), 'handover' => EpisodeHandovers::forClinicalPage($r, $p), 'episodes' => CareEpisode::where('patient_id', $id)->with('discharge')->get(['id', 'title', 'current_plan_id'])->map(fn ($episode) => [
+        return Inertia::render('clinical/index', ['patient' => $p->only(['id', 'name', 'reference']), 'manage' => $manage, 'permissions' => $permissions, 'noteTypes' => $scopedPlanRead && ! $permissions['notes']['read'] ? [] : $types, 'scopedPlanRead' => $scopedPlanRead, 'rows' => array_merge($notes->all(), $plans->all()), 'schema' => config('clinical.forms'), 'handover' => EpisodeHandovers::forClinicalPage($r, $p), 'episodes' => ! $planMetadata ? [] : CareEpisode::where('patient_id', $id)
+            ->when($scopedPlanRead, fn ($query) => $query->whereKey($planEpisodeIds)->whereDoesntHave('discharge'))
+            ->with('discharge')->get(['id', 'title', 'current_plan_id'])->map(fn ($episode) => [
             ...$episode->only(['id', 'title', 'current_plan_id']),
             'discharged_at' => $episode->discharge?->signed_at,
-            'discharge' => $permissions['plans']['read'] ? $episode->discharge?->only(['signed_by', 'content', 'signed_at']) : null,
-        ]), 'visits' => Appointment::where('patient_id', $id)->where('provider_id', $r->user()->id)->whereIn('status', ['confirmed', 'arrived', 'completed', 'aborted'])->get(['id', 'service', 'starts_at']), 'referrals' => Referral::where('patient_id', $id)->get(['id', 'discipline']), 'staff' => Workspace::staff($p->organisation_id)->whereIn('id', PatientAccessRule::where('patient_id', $id)->where('kind', 'assignment')->whereIn('role', ['doctor', 'nurse', 'physiotherapist', 'carer'])->whereNull('revoked_at')->where('starts_at', '<=', now())->where('ends_at', '>', now())->select('user_id'))->select('id', 'name')->orderBy('name')->get(), 'reviewBackups' => Workspace::staff($p->organisation_id)->get()->filter(fn ($u) => $u->id !== $r->user()->id && $u->hasPermission('tasks.manage', $p->organisation_id))->values()->map(fn ($u) => $u->only(['id', 'name']))]);
+            'discharge' => ! $scopedPlanRead && $permissions['plans']['read'] ? $episode->discharge?->only(['signed_by', 'content', 'signed_at']) : null,
+        ]), 'visits' => $scopedPlanRead && ! $permissions['notes']['write'] ? [] : Appointment::where('patient_id', $id)->where('provider_id', $r->user()->id)->whereIn('status', ['confirmed', 'arrived', 'completed', 'aborted'])->get(['id', 'service', 'starts_at']), 'referrals' => $scopedPlanRead || ! $planMetadata ? [] : Referral::where('patient_id', $id)->get(['id', 'discipline']), 'staff' => $scopedPlanRead || ! $planMetadata ? [] : Workspace::staff($p->organisation_id)->whereIn('id', PatientAccessRule::where('patient_id', $id)->where('kind', 'assignment')->whereIn('role', ['doctor', 'nurse', 'physiotherapist', 'carer'])->whereNull('revoked_at')->where('starts_at', '<=', now())->where('ends_at', '>', now())->select('user_id'))->select('id', 'name')->orderBy('name')->get(), 'reviewBackups' => $scopedPlanRead || ! $planMetadata ? [] : Workspace::staff($p->organisation_id)->get()->filter(fn ($u) => $u->id !== $r->user()->id && $u->hasPermission('tasks.manage', $p->organisation_id))->values()->map(fn ($u) => $u->only(['id', 'name']))]);
     }
 
     private function visit(Request $r, Patient $p, int $id): Appointment
