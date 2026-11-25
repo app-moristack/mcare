@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
+use App\Models\Organisation;
+use App\Services\IncidentReports;
 use App\Services\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,13 +24,34 @@ class ProviderVisitController extends Controller
         $orgs = Workspace::memberships($r->user())->whereIn('role', ['doctor', 'nurse', 'carer', 'physiotherapist'])->pluck('organisation_id');
 
         $visits = Appointment::where('provider_id', $r->user()->id)->whereIn('organisation_id', $orgs)
-            ->with(['patient:id,name,reference', 'attendance.review', 'attendance.corrections' => fn ($query) => $query->latest(), 'checklist'])
+            ->with([
+                'patient:id,name,reference', 'attendance.review', 'attendance.corrections' => fn ($query) => $query->latest(), 'checklist',
+                'incidents' => fn ($query) => $query->where('reporter_id', $r->user()->id)->latest('id')
+                    ->select('id', 'visit_id', 'status', 'reported_at', 'resolved_at'),
+            ])
             ->orderByDesc('starts_at')->paginate(15)->through(fn (Appointment $visit) => [
                 ...$visit->toArray(),
                 'checklist' => $visit->checklist?->forPage($visit->canSubmitChecklist()),
+                'can_report_incident' => $visit->offer_status === 'accepted' && $r->user()->account_status === 'active',
+                'incidents' => $visit->incidents->map->only(['id', 'status', 'reported_at', 'resolved_at']),
             ]);
 
         return Inertia::render('care/visits', ['visits' => $visits]);
+    }
+
+    public function reportIncident(Request $r, int $id)
+    {
+        $data = $r->validate(IncidentReports::RULES);
+        $organisationId = Appointment::findOrFail($id, ['organisation_id'])->organisation_id;
+        DB::transaction(function () use ($r, $id, $data, $organisationId) {
+            Organisation::lockForUpdate()->findOrFail($organisationId);
+            $visit = Appointment::where('organisation_id', $organisationId)->lockForUpdate()->findOrFail($id);
+            $this->allowed($r, $visit);
+            abort_unless($r->user()->account_status === 'active' && $visit->offer_status === 'accepted', 403, 'Only the assigned provider on an accepted visit can submit an incident.');
+            IncidentReports::record($r, $visit->organisation_id, $data, $visit->id);
+        }, 3);
+
+        return back()->with('success', 'Incident recorded for internal review.');
     }
 
     public function submitChecklist(Request $r, int $id)

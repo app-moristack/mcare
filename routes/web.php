@@ -11,6 +11,7 @@ use App\Http\Controllers\DocumentVaultController;
 use App\Http\Controllers\EpisodeDischargeController;
 use App\Http\Controllers\EpisodeHandoverController;
 use App\Http\Controllers\GlobalSearchController;
+use App\Http\Controllers\IncidentController;
 use App\Http\Controllers\InvestigationController;
 use App\Http\Controllers\MedicationController;
 use App\Http\Controllers\MfaController;
@@ -93,6 +94,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/patient-records/{id}/access/{rule}/revoke', [PatientRecordController::class, 'revoke']);
         Route::get('/search', GlobalSearchController::class)->middleware('throttle:60,1');
         Route::get('/my-visits', [ProviderVisitController::class, 'index']);
+        Route::post('/my-visits/{id}/incidents', [ProviderVisitController::class, 'reportIncident'])->whereNumber('id');
         Route::post('/my-visits/{id}/checklist', [ProviderVisitController::class, 'submitChecklist'])->whereNumber('id');
         Route::post('/my-visits/{id}/attendance', [ProviderVisitController::class, 'attendance']);
         Route::post('/my-visits/{appointmentId}/attendance/{eventId}/corrections', [AttendanceReviewController::class, 'requestCorrection'])->whereNumber(['appointmentId', 'eventId']);
@@ -118,6 +120,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/workspace/checklists', [ChecklistController::class, 'store']);
         Route::post('/workspace/checklists/{template}/versions', [ChecklistController::class, 'storeVersion'])->whereNumber('template');
         Route::post('/workspace/checklists/{template}/versions/{version}/publish', [ChecklistController::class, 'publish'])->whereNumber(['template', 'version']);
+        Route::get('/workspace/incidents', [IncidentController::class, 'index']);
+        Route::post('/workspace/incidents', [IncidentController::class, 'store']);
+        Route::post('/workspace/incidents/{id}/assign', [IncidentController::class, 'assign'])->whereNumber('id');
+        Route::post('/workspace/incidents/{id}/resolve', [IncidentController::class, 'resolve'])->whereNumber('id');
         Route::get('/workspace/{module}', [OperationsController::class, 'index'])->name('operations.index');
         Route::post('/workspace/{module}', [OperationsController::class, 'store']);
         Route::patch('/workspace/{module}/{id}', [OperationsController::class, 'update']);

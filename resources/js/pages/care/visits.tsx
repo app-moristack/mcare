@@ -4,6 +4,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/compone
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { type VisitChecklist, VisitChecklistButton } from '@/pages/checklists/visit-checklist';
+import IncidentReport, { incidentStatus, type VisitIncident } from '@/pages/incidents/report';
+import { date } from '@/pages/patients/fields';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Clock, MapPin } from 'lucide-react';
 import { useState } from 'react';
@@ -11,6 +13,8 @@ type Visit = {
     id: number;
     version: number;
     checklist?: VisitChecklist | null;
+    incidents?: VisitIncident[];
+    can_report_incident?: boolean;
     service: string;
     status: string;
     starts_at: string;
@@ -88,6 +92,7 @@ function CorrectionRequest({ visitId, event }: { visitId: number; event: Visit['
 }
 export default function Visits({ visits }: { visits: { data: Visit[]; links: { url: string | null; label: string }[] } }) {
     const [active, setActive] = useState<Visit>();
+    const [reportingVisit, setReportingVisit] = useState<number>();
     const [kind, setKind] = useState('arrival');
     const [reason, setReason] = useState('');
     const [capture, setCapture] = useState<{ status: string; latitude?: number; longitude?: number; accuracy?: number }>({ status: 'unavailable' });
@@ -159,6 +164,28 @@ export default function Visits({ visits }: { visits: { data: Visit[]; links: { u
                                     <VisitChecklistButton checklist={v.checklist} visitId={v.id} visitVersion={v.version} provider />
                                 </div>
                             )}
+                            {(v.can_report_incident || !!v.incidents?.length) && (
+                                <div className="mt-5 space-y-3 rounded-xl border p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <h3 className="text-sm font-medium">Incident reports</h3>
+                                        {v.can_report_incident && (
+                                            <Button variant="outline" size="sm" onClick={() => setReportingVisit(v.id)}>
+                                                Report incident
+                                            </Button>
+                                        )}
+                                    </div>
+                                    {v.incidents?.map((incident) => (
+                                        <div className="flex flex-wrap items-center justify-between gap-2 text-sm" key={incident.id}>
+                                            <span>
+                                                Incident #{incident.id} · {date(incident.reported_at)}
+                                            </span>
+                                            <Badge variant={incident.status === 'resolved' ? 'success' : 'secondary'}>
+                                                {incidentStatus[incident.status]}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                             <div className="text-muted-foreground mt-5 space-y-2 text-sm">
                                 {v.attendance.map((a) => (
                                     <div className="rounded-xl border p-3" key={a.kind}>
@@ -214,6 +241,7 @@ export default function Visits({ visits }: { visits: { data: Visit[]; links: { u
                             </Link>
                         ))}
                 </div>
+                {reportingVisit !== undefined && <IncidentReport visitId={reportingVisit} onClose={() => setReportingVisit(undefined)} />}
                 {active && (
                     <Dialog open onOpenChange={(v) => !v && setActive(undefined)}>
                         <DialogContent>

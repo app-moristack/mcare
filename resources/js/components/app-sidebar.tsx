@@ -10,6 +10,7 @@ import {
     CalendarDays,
     CalendarRange,
     ChevronLeft,
+    CircleAlert,
     ClipboardList,
     Clock,
     CreditCard,
@@ -35,6 +36,7 @@ function SidebarContents() {
         ...(allowed('appointments.manage') ? [{ title: 'Attendance review', url: '/workspace/attendance-review', icon: Clock }] : []),
     ];
     const operations: NavigationLink[] = [
+        { title: 'Incidents', url: '/workspace/incidents', icon: CircleAlert, permission: 'incidents.manage' },
         { title: 'Checklists', url: '/workspace/checklists', icon: ClipboardList, permission: 'appointments.manage' },
         { title: 'Referrals', url: '/workspace/referrals', icon: ClipboardList, permission: 'referrals.manage' },
         { title: 'Tasks', url: '/workspace/tasks', icon: ListTodo, permission: 'tasks.manage', count: workspace?.notifications.length ?? 0 },

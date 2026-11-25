@@ -20,6 +20,7 @@ use App\Models\MedicationAdministration;
 use App\Models\MedicationInstruction;
 use App\Models\MedicationReconciliation;
 use App\Models\MissedVisitCase;
+use App\Models\OperationalIncident;
 use App\Models\Organisation;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
@@ -483,6 +484,31 @@ class DemoDataSeeder extends Seeder
                 'attached_by' => $users['coordinator']->id, 'attach_request_id' => $this->uuid('visit-with-sop-attachment'),
                 'attached_at' => now(),
             ]);
+            foreach ([
+                'provider' => [
+                    'visit_id' => $demoChecklistVisit->id, 'reporter_id' => $users['nurse']->id, 'reviewer_id' => null,
+                    'category' => 'service_delivery', 'severity' => 'routine',
+                    'description' => 'Synthetic practice report for an internal visit coordination issue. No real patient information.',
+                ],
+                'assigned' => [
+                    'visit_id' => null, 'reporter_id' => $users['coordinator']->id, 'reviewer_id' => $users['lead']->id,
+                    'category' => 'other', 'severity' => 'routine',
+                    'description' => 'Synthetic practice report for an operational record review. No real incident.',
+                ],
+            ] as $scenario => $report) {
+                $attributes = ['organisation_id' => $org->id, ...$report];
+                OperationalIncident::firstOrCreate([
+                    'organisation_id' => $org->id, 'reporter_id' => $report['reporter_id'],
+                    'request_id' => $this->uuid('operation-incident-'.$scenario),
+                ], [
+                    ...$attributes,
+                    'status' => $report['reviewer_id'] === null ? 'reported' : 'assigned',
+                    'assigned_by' => $report['reviewer_id'] === null ? null : $report['reporter_id'],
+                    'assigned_at' => $report['reviewer_id'] === null ? null : now()->subHour(),
+                    'reported_at' => now()->subHours(2),
+                    'content_hash' => hash('sha256', json_encode($attributes, JSON_THROW_ON_ERROR)),
+                ]);
+            }
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {
                 DB::table('audit_events')->insert(['organisation_id' => $org->id, 'actor_id' => $admin->id, 'event' => 'demo.seeded', 'created_at' => now()]);

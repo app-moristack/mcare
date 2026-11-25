@@ -2,13 +2,13 @@
 
 return [
     // Register new abilities here before exposing them through routes or policies.
-    'abilities' => ['dashboard.view', 'account.manage', 'profile.manage', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'team.manage', 'finance.manage', 'audit.view'],
+    'abilities' => ['dashboard.view', 'account.manage', 'profile.manage', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'team.manage', 'finance.manage', 'audit.view', 'incidents.manage'],
     'grants' => [
         'super_admin' => ['*'],
-        'owner' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'team.manage', 'finance.manage', 'audit.view'],
-        'operational_admin' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'team.manage'],
-        'coordinator' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage'],
-        'clinical_admin' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage'],
+        'owner' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'team.manage', 'finance.manage', 'audit.view', 'incidents.manage'],
+        'operational_admin' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'team.manage', 'incidents.manage'],
+        'coordinator' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'incidents.manage'],
+        'clinical_admin' => ['dashboard.view', 'patients.manage', 'referrals.manage', 'appointments.manage', 'tasks.manage', 'incidents.manage'],
         'finance' => ['dashboard.view', 'finance.manage'],
     ],
     'roles' => [

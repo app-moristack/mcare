@@ -27,6 +27,11 @@ class Appointment extends Model
         return $this->belongsTo(User::class, 'provider_id');
     }
 
+    public function incidents()
+    {
+        return $this->hasMany(OperationalIncident::class, 'visit_id');
+    }
+
     public function checklist()
     {
         return $this->hasOne(VisitChecklist::class);
