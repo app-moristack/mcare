@@ -79,9 +79,13 @@ class IncidentWorkflowTest extends TestCase
         $this->assertSame(1, DB::table('audit_events')->where('event', 'incident.reported')->where('resource_id', $report->id)->count());
 
         $this->get($route)->assertInertia(fn (Assert $page) => $page->component('incidents/index', false)
-            ->has('incidents.data', 3)->where('incidents.data.0.description', $input['description'])->where('currentUserId', $this->coordinator->id))
+            ->has('incidents.data', 4)->where('incidents.data.0.description', $input['description'])->where('currentUserId', $this->coordinator->id))
             ->assertDontSee('Foreign private synthetic report.');
         $this->postJson($route.'/'.$foreign->id.'/assign', ['version' => 1, 'reviewer_id' => $this->lead->id])->assertNotFound();
+        $this->postJson($route.'/'.$foreign->id.'/reassign', [
+            'version' => 1, 'reviewer_id' => $this->lead->id, 'reason' => 'Synthetic reason.',
+            'password' => DemoDataSeeder::PASSWORD, 'declaration' => true,
+        ])->assertNotFound();
         $this->withSession(['organisation_id' => $foreignOrg->id])->get($route)->assertForbidden();
     }
 
@@ -139,5 +143,67 @@ class IncidentWorkflowTest extends TestCase
                 && $report['status'] === 'resolved';
         }))->assertDontSee($resolution['resolution'])->assertDontSee($input['description']);
         $this->assertSame($initialAlerts, DB::table('operation_notifications')->count());
+    }
+
+    public function test_reviewed_reassignment_retains_previous_attribution_and_transfers_resolution_authority(): void
+    {
+        $incident = OperationalIncident::where('visit_id', $this->visit->id)->where('status', 'reported')->firstOrFail();
+        $base = '/workspace/incidents/'.$incident->id;
+        $this->workspace($this->coordinator)->post($base.'/assign', ['reviewer_id' => $this->coordinator->id, 'version' => $incident->version])
+            ->assertSessionHasNoErrors();
+        $assigned = $incident->fresh();
+        $signature = ['password' => DemoDataSeeder::PASSWORD, 'declaration' => true];
+        $move = [
+            'reviewer_id' => $this->lead->id, 'version' => $assigned->version,
+            'reason' => 'Synthetic continuity evidence explaining why a different reviewer was selected.',
+            ...$signature,
+        ];
+        $this->workspace($this->nurse)->postJson($base.'/reassign', $move)->assertForbidden();
+        $this->workspace($this->coordinator)->postJson($base.'/reassign', [...$move, 'password' => 'wrong', 'reason' => ''])
+            ->assertUnprocessable()->assertJsonValidationErrors(['password', 'reason']);
+        $this->postJson($base.'/reassign', [...$move, 'version' => $assigned->version + 1])->assertConflict();
+        $this->postJson($base.'/reassign', [...$move, 'reviewer_id' => $this->coordinator->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('reviewer_id');
+        $this->postJson($base.'/reassign', [...$move, 'reviewer_id' => $this->nurse->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('reviewer_id');
+
+        $membership = $this->lead->memberships()->where('organisation_id', $this->organisation->id)->where('role', 'clinical_admin')->firstOrFail();
+        $membership->update(['status' => 'suspended']);
+        $this->postJson($base.'/reassign', $move)->assertUnprocessable()->assertJsonValidationErrors('reviewer_id');
+        $membership->update(['status' => 'active']);
+
+        $this->post($base.'/reassign', $move)->assertSessionHasNoErrors();
+        $this->post($base.'/reassign', $move)->assertSessionHasNoErrors();
+        $this->postJson($base.'/reassign', [...$move, 'reason' => 'Changed retry payload.'])->assertConflict();
+        $this->postJson($base.'/assign', ['reviewer_id' => $this->lead->id, 'version' => $assigned->version])->assertConflict();
+        $current = $incident->fresh();
+        $history = $incident->reassignments()->sole();
+        $this->assertSame($this->lead->id, $current->reviewer_id);
+        $this->assertSame($assigned->version + 1, $current->version);
+        $this->assertSame($assigned->content_hash, $current->content_hash);
+        $this->assertSame($assigned->reviewer_id, $history->previous_reviewer_id);
+        $this->assertSame($assigned->assigned_by, $history->previous_assigned_by);
+        $this->assertEquals($assigned->assigned_at, $history->previous_assigned_at);
+        $this->assertSame($move['reason'], $history->reason);
+        $this->assertStringNotContainsString($move['reason'], $history->getRawOriginal('reason'));
+        $this->assertSame(1, DB::table('audit_events')->where('event', 'incident.reassigned')->where('resource_id', $incident->id)->count());
+        $this->get('/workspace/incidents')->assertInertia(fn (Assert $page) => $page->where('incidents.data', function ($items) use ($incident, $history, $move) {
+            $row = collect($items)->firstWhere('id', $incident->id);
+
+            return count($row['reassignments']) === 1
+                && $row['reassignments'][0]['id'] === $history->id
+                && $row['reassignments'][0]['previous_reviewer']['id'] === $this->coordinator->id
+                && $row['reassignments'][0]['reviewer']['id'] === $this->lead->id
+                && $row['reassignments'][0]['changed_by']['id'] === $this->coordinator->id
+                && $row['reassignments'][0]['reason'] === $move['reason'];
+        }));
+
+        $resolution = ['version' => $current->version, 'resolution' => 'Synthetic closure following reassignment.', ...$signature];
+        $this->postJson($base.'/resolve', $resolution)->assertForbidden();
+        $this->workspace($this->lead)->post($base.'/resolve', $resolution)->assertSessionHasNoErrors();
+        $this->postJson($base.'/reassign', [...$move, 'reviewer_id' => $this->coordinator->id, 'version' => $incident->fresh()->version])->assertConflict();
+        $this->assertSame('resolved', $incident->fresh()->status);
+        $this->assertSame(1, $incident->reassignments()->count());
+        $this->workspace($this->nurse)->get('/my-visits')->assertDontSee($move['reason'])->assertDontSee($resolution['resolution']);
     }
 }

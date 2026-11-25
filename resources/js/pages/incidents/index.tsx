@@ -16,6 +16,15 @@ import IncidentReport, {
     type VisitIncident,
 } from './report';
 
+type Reassignment = {
+    id: number;
+    previous_reviewer: IncidentPerson;
+    reviewer: IncidentPerson;
+    changed_by: IncidentPerson;
+    reason: string;
+    changed_at: string;
+};
+
 type Incident = VisitIncident & {
     category: keyof typeof incidentCategories;
     severity: 'routine' | 'urgent';
@@ -24,35 +33,51 @@ type Incident = VisitIncident & {
     reviewer: IncidentPerson | null;
     description: string;
     resolution: string | null;
+    reassignments?: Reassignment[];
     version: number;
 };
 
 type IncidentPage = { data: Incident[]; links: { url: string | null; label: string; active: boolean }[] };
-type Action = { incident: Incident; mode: 'assign' | 'resolve' };
+type Action = { incident: Incident; mode: 'assign' | 'reassign' | 'resolve' };
 const base = '/workspace/incidents';
+
+const reviewActions = {
+    assign: { label: 'Assign incident reviewer', submit: 'Assign reviewer' },
+    reassign: { label: 'Reassign incident reviewer', submit: 'Sign and reassign' },
+    resolve: { label: 'Resolve incident', submit: 'Sign and resolve' },
+};
 
 function ReviewDialog({ action, reviewers, onClose }: { action: Action; reviewers: IncidentPerson[]; onClose: () => void }) {
     const { incident, mode } = action;
     const assigning = mode === 'assign';
+    const reassigning = mode === 'reassign';
+    const signing = !assigning;
+    const explanation = reassigning ? 'reason' : 'resolution';
     const form = useForm({
         version: incident.version,
         reviewer_id: '',
         resolution: '',
+        reason: '',
         password: '',
         declaration: false as boolean,
     });
     return (
         <Dialog open onOpenChange={(open) => !open && !form.processing && onClose()}>
             <DialogContent className={incidentDialogClass}>
-                <DialogTitle>{assigning ? 'Assign incident reviewer' : 'Resolve incident'}</DialogTitle>
+                <DialogTitle>{reviewActions[mode].label}</DialogTitle>
                 <DialogDescription className="break-words">
                     Incident #{incident.id} · {incidentCategories[incident.category]}
+                    {reassigning && incident.reviewer ? ` · Current reviewer ${incident.reviewer.name}` : ''}
                 </DialogDescription>
                 <form
                     className="min-w-0 space-y-4"
                     onSubmit={(event) => {
                         event.preventDefault();
-                        form.transform(({ reviewer_id, ...resolve }) => (assigning ? { version: incident.version, reviewer_id } : resolve));
+                        form.transform(({ version, reviewer_id, reason, resolution, password, declaration }) => {
+                            if (assigning) return { version, reviewer_id };
+                            const signature = { password, declaration };
+                            return reassigning ? { version, reviewer_id, reason, ...signature } : { version, resolution, ...signature };
+                        });
                         form.post(`${base}/${incident.id}/${mode}`, {
                             preserveScroll: true,
                             onSuccess: onClose,
@@ -61,9 +86,9 @@ function ReviewDialog({ action, reviewers, onClose }: { action: Action; reviewer
                     }}
                 >
                     <Errors errors={form.errors} />
-                    {assigning ? (
+                    {mode !== 'resolve' && (
                         <label className="block min-w-0 space-y-1 text-sm font-medium">
-                            <span>Independent reviewer</span>
+                            <span>{reassigning ? 'New independent reviewer' : 'Independent reviewer'}</span>
                             <select
                                 className={incidentControlClass}
                                 required
@@ -80,17 +105,18 @@ function ReviewDialog({ action, reviewers, onClose }: { action: Action; reviewer
                                 ))}
                             </select>
                         </label>
-                    ) : (
+                    )}
+                    {signing && (
                         <>
                             <label className="block min-w-0 space-y-1 text-sm font-medium">
-                                <span>Resolution and action taken</span>
+                                <span>{reassigning ? 'Reason for reassignment' : 'Resolution and action taken'}</span>
                                 <textarea
                                     className={incidentControlClass}
                                     rows={5}
                                     required
                                     maxLength={4000}
-                                    value={form.data.resolution}
-                                    onChange={(event) => form.setData('resolution', event.target.value)}
+                                    value={form.data[explanation]}
+                                    onChange={(event) => form.setData(explanation, event.target.value)}
                                 />
                             </label>
                             <label className="block space-y-1 text-sm font-medium">
@@ -111,12 +137,16 @@ function ReviewDialog({ action, reviewers, onClose }: { action: Action; reviewer
                                     checked={form.data.declaration}
                                     onChange={(event) => form.setData('declaration', event.target.checked)}
                                 />
-                                <span>I reviewed this incident and confirm the recorded resolution.</span>
+                                <span>
+                                    {reassigning
+                                        ? 'I confirm the new reviewer and the reason for this change.'
+                                        : 'I reviewed this incident and confirm the recorded resolution.'}
+                                </span>
                             </label>
                         </>
                     )}
                     <Button type="submit" disabled={form.processing}>
-                        {assigning ? 'Assign reviewer' : 'Sign and resolve'}
+                        {reviewActions[mode].submit}
                     </Button>
                 </form>
             </DialogContent>
@@ -156,6 +186,7 @@ export default function Incidents({
                 {!incidents.data.length && <p className="surface text-muted-foreground p-4 text-sm sm:p-6">No incidents reported.</p>}
                 {incidents.data.map((incident) => {
                     const eligibleReviewers = reviewers.filter((reviewer) => reviewer.id !== incident.reporter.id);
+                    const canReassign = incident.status === 'assigned' && eligibleReviewers.some((reviewer) => reviewer.id !== incident.reviewer?.id);
                     return (
                         <article className="surface min-w-0 space-y-3 p-4 sm:p-6" key={incident.id}>
                             <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
@@ -199,20 +230,46 @@ export default function Incidents({
                                     </div>
                                 )}
                             </details>
-                            {incident.status === 'reported' && (
-                                <Button
-                                    variant="outline"
-                                    disabled={eligibleReviewers.length === 0}
-                                    onClick={() => setAction({ incident, mode: 'assign' })}
-                                >
-                                    Assign reviewer
-                                </Button>
+                            {!!incident.reassignments?.length && (
+                                <details className="min-w-0 space-y-3 text-sm">
+                                    <summary className="cursor-pointer font-medium">Reviewer change history</summary>
+                                    <ol className="space-y-3">
+                                        {incident.reassignments.map((change) => (
+                                            <li className="min-w-0 space-y-1 rounded-md border p-3" key={change.id}>
+                                                <p className="font-medium break-words">
+                                                    {change.previous_reviewer.name} → {change.reviewer.name}
+                                                </p>
+                                                <p className="text-muted-foreground break-words">
+                                                    Changed by {change.changed_by.name} ·{' '}
+                                                    <time dateTime={change.changed_at}>{date(change.changed_at)}</time>
+                                                </p>
+                                                <p className="break-words whitespace-pre-wrap">{change.reason}</p>
+                                            </li>
+                                        ))}
+                                    </ol>
+                                </details>
                             )}
-                            {incident.status === 'assigned' && incident.reviewer?.id === currentUserId && (
-                                <Button variant="outline" onClick={() => setAction({ incident, mode: 'resolve' })}>
-                                    Resolve incident
-                                </Button>
-                            )}
+                            <div className="flex flex-wrap gap-2">
+                                {incident.status === 'reported' && (
+                                    <Button
+                                        variant="outline"
+                                        disabled={eligibleReviewers.length === 0}
+                                        onClick={() => setAction({ incident, mode: 'assign' })}
+                                    >
+                                        Assign reviewer
+                                    </Button>
+                                )}
+                                {canReassign && (
+                                    <Button variant="outline" onClick={() => setAction({ incident, mode: 'reassign' })}>
+                                        Reassign reviewer
+                                    </Button>
+                                )}
+                                {incident.status === 'assigned' && incident.reviewer?.id === currentUserId && (
+                                    <Button variant="outline" onClick={() => setAction({ incident, mode: 'resolve' })}>
+                                        Resolve incident
+                                    </Button>
+                                )}
+                            </div>
                         </article>
                     );
                 })}
@@ -235,7 +292,11 @@ export default function Incidents({
                 {action && (
                     <ReviewDialog
                         action={action}
-                        reviewers={reviewers.filter((reviewer) => reviewer.id !== action.incident.reporter.id)}
+                        reviewers={reviewers.filter(
+                            (reviewer) =>
+                                reviewer.id !== action.incident.reporter.id &&
+                                (action.mode !== 'reassign' || reviewer.id !== action.incident.reviewer?.id),
+                        )}
                         onClose={() => setAction(null)}
                     />
                 )}

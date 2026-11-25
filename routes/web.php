@@ -123,6 +123,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/workspace/incidents', [IncidentController::class, 'index']);
         Route::post('/workspace/incidents', [IncidentController::class, 'store']);
         Route::post('/workspace/incidents/{id}/assign', [IncidentController::class, 'assign'])->whereNumber('id');
+        Route::post('/workspace/incidents/{id}/reassign', [IncidentController::class, 'reassign'])->whereNumber('id');
         Route::post('/workspace/incidents/{id}/resolve', [IncidentController::class, 'resolve'])->whereNumber('id');
         Route::get('/workspace/{module}', [OperationsController::class, 'index'])->name('operations.index');
         Route::post('/workspace/{module}', [OperationsController::class, 'store']);

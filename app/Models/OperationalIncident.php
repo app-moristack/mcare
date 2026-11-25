@@ -19,6 +19,11 @@ class OperationalIncident extends Model
         ];
     }
 
+    public function reassignments()
+    {
+        return $this->hasMany(IncidentReassignment::class)->orderBy('previous_version');
+    }
+
     public function reporter()
     {
         return $this->belongsTo(User::class, 'reporter_id');

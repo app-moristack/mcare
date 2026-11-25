@@ -495,9 +495,14 @@ class DemoDataSeeder extends Seeder
                     'category' => 'other', 'severity' => 'routine',
                     'description' => 'Synthetic practice report for an operational record review. No real incident.',
                 ],
+                'reassigned' => [
+                    'visit_id' => null, 'reporter_id' => $users['lead']->id, 'reviewer_id' => $admin->id,
+                    'category' => 'other', 'severity' => 'routine',
+                    'description' => 'Synthetic practice report showing retained reviewer reassignment evidence.',
+                ],
             ] as $scenario => $report) {
                 $attributes = ['organisation_id' => $org->id, ...$report];
-                OperationalIncident::firstOrCreate([
+                $incident = OperationalIncident::firstOrCreate([
                     'organisation_id' => $org->id, 'reporter_id' => $report['reporter_id'],
                     'request_id' => $this->uuid('operation-incident-'.$scenario),
                 ], [
@@ -508,6 +513,23 @@ class DemoDataSeeder extends Seeder
                     'reported_at' => now()->subHours(2),
                     'content_hash' => hash('sha256', json_encode($attributes, JSON_THROW_ON_ERROR)),
                 ]);
+                if ($incident->wasRecentlyCreated && $scenario === 'reassigned') {
+                    $changedAt = now()->subMinutes(30);
+                    $incident->reassignments()->create([
+                        'previous_reviewer_id' => $admin->id,
+                        'previous_assigned_by' => $incident->assigned_by,
+                        'previous_assigned_at' => $incident->assigned_at,
+                        'reviewer_id' => $users['coordinator']->id,
+                        'changed_by' => $admin->id,
+                        'reason' => 'Synthetic practice reason for changing the operational reviewer.',
+                        'changed_at' => $changedAt,
+                        'previous_version' => $incident->version ?? 1,
+                    ]);
+                    $incident->update([
+                        'reviewer_id' => $users['coordinator']->id, 'assigned_by' => $admin->id,
+                        'assigned_at' => $changedAt, 'version' => 2,
+                    ]);
+                }
             }
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {

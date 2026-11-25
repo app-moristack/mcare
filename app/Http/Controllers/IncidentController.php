@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
+use App\Models\IncidentReassignment;
 use App\Models\OperationalIncident;
 use App\Models\Organisation;
 use App\Models\User;
@@ -19,10 +20,19 @@ class IncidentController extends Controller
     {
         $organisationId = Workspace::organisation($request, 'incidents.manage');
         $incidents = OperationalIncident::where('organisation_id', $organisationId)
-            ->with(['reporter:id,name', 'reviewer:id,name'])->latest('id')->paginate(20)->through(fn (OperationalIncident $incident) => [
+            ->with([
+                'reporter:id,name', 'reviewer:id,name', 'reassignments.previousReviewer:id,name',
+                'reassignments.reviewer:id,name', 'reassignments.changer:id,name',
+            ])->latest('id')->paginate(20)->through(fn (OperationalIncident $incident) => [
                 ...$incident->only(['id', 'visit_id', 'category', 'severity', 'status', 'description', 'resolution', 'reported_at', 'resolved_at', 'version']),
                 'reporter' => $incident->reporter->only(['id', 'name']),
                 'reviewer' => $incident->reviewer?->only(['id', 'name']),
+                'reassignments' => $incident->reassignments->map(fn (IncidentReassignment $change) => [
+                    ...$change->only(['id', 'reason', 'changed_at']),
+                    'previous_reviewer' => $change->previousReviewer->only(['id', 'name']),
+                    'reviewer' => $change->reviewer->only(['id', 'name']),
+                    'changed_by' => $change->changer->only(['id', 'name']),
+                ]),
             ]);
         $reviewers = Workspace::staff($organisationId)->orderBy('name')->get()
             ->filter(fn (User $user) => $user->hasPermission('incidents.manage', $organisationId))
@@ -69,7 +79,8 @@ class IncidentController extends Controller
             $reviewerId = (int) $data['reviewer_id'];
             $version = (int) $data['version'];
             if ($incident->status === 'assigned' && $incident->version === $version + 1
-                && $incident->reviewer_id === $reviewerId && $incident->assigned_by === $request->user()->id) {
+                && $incident->reviewer_id === $reviewerId && $incident->assigned_by === $request->user()->id
+                && ! $incident->reassignments()->where('previous_version', $version)->exists()) {
                 return;
             }
 
@@ -86,6 +97,65 @@ class IncidentController extends Controller
         }, 3);
 
         return back()->with('success', 'Reviewer assigned.');
+    }
+
+    public function reassign(Request $request, int $id)
+    {
+        $organisationId = Workspace::organisation($request, 'incidents.manage');
+        $data = $request->validate([
+            'reviewer_id' => 'required|integer|min:1',
+            'version' => 'required|integer|min:1',
+            'reason' => 'required|string|max:4000',
+            'password' => 'required|current_password',
+            'declaration' => 'accepted',
+        ]);
+
+        DB::transaction(function () use ($request, $organisationId, $id, $data) {
+            $incident = OperationalIncident::where('organisation_id', $organisationId)->lockForUpdate()->findOrFail($id);
+            $actor = $request->user();
+            abort_unless($actor->hasPermission('incidents.manage', $organisationId)
+                && Workspace::staff($organisationId)->whereKey($actor->id)->exists(), 403);
+
+            $version = (int) $data['version'];
+            $reviewerId = (int) $data['reviewer_id'];
+            $existing = $incident->reassignments()->where('previous_version', $version)->first();
+            if ($existing) {
+                abort_unless($existing->changed_by === $actor->id && $existing->reviewer_id === $reviewerId
+                    && $existing->reason === $data['reason'], 409, 'This incident already changed. Reload before making another reassignment.');
+
+                return;
+            }
+
+            abort_unless($incident->status === 'assigned' && $incident->reviewer_id !== null && $incident->version === $version,
+                409,
+                'Only a current unresolved assignment can be changed. Reload this incident.'
+            );
+            if ($incident->reviewer_id === $reviewerId) {
+                throw ValidationException::withMessages(['reviewer_id' => 'Choose a different reviewer from the current reviewer.']);
+            }
+            IncidentReports::ensureReviewer($organisationId, $reviewerId, $incident->reporter_id);
+
+            $changedAt = now();
+            $incident->reassignments()->create([
+                'previous_reviewer_id' => $incident->reviewer_id,
+                'previous_assigned_by' => $incident->assigned_by,
+                'previous_assigned_at' => $incident->assigned_at,
+                'reviewer_id' => $reviewerId,
+                'changed_by' => $actor->id,
+                'reason' => $data['reason'],
+                'changed_at' => $changedAt,
+                'previous_version' => $version,
+            ]);
+            $incident->update([
+                'reviewer_id' => $reviewerId,
+                'assigned_by' => $actor->id,
+                'assigned_at' => $changedAt,
+                'version' => $version + 1,
+            ]);
+            Workspace::audit($request, 'incident.reassigned', $organisationId, 'operational_incidents', $incident->id);
+        }, 3);
+
+        return back()->with('success', 'Reviewer reassigned with retained evidence.');
     }
 
     public function resolve(Request $request, int $id)
