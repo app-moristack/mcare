@@ -3,11 +3,14 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
+import { type VisitChecklist, VisitChecklistButton } from '@/pages/checklists/visit-checklist';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Clock, MapPin } from 'lucide-react';
 import { useState } from 'react';
 type Visit = {
     id: number;
+    version: number;
+    checklist?: VisitChecklist | null;
     service: string;
     status: string;
     starts_at: string;
@@ -145,6 +148,17 @@ export default function Visits({ visits }: { visits: { data: Visit[]; links: { u
                                 <MapPin className="text-muted-foreground size-4" />
                                 {v.location}
                             </p>
+                            {v.checklist && (
+                                <div className="mt-5 flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-xl border p-3">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium break-words">{v.checklist.title}</p>
+                                        <p className="text-muted-foreground text-xs">
+                                            Version {v.checklist.version} · {v.checklist.submitted_at ? 'Signed' : 'Awaiting submission'}
+                                        </p>
+                                    </div>
+                                    <VisitChecklistButton checklist={v.checklist} visitId={v.id} visitVersion={v.version} provider />
+                                </div>
+                            )}
                             <div className="text-muted-foreground mt-5 space-y-2 text-sm">
                                 {v.attendance.map((a) => (
                                     <div className="rounded-xl border p-3" key={a.kind}>

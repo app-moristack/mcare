@@ -5,11 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { AttachVisitChecklist, type ChecklistOption, type VisitChecklist, VisitChecklistButton } from '@/pages/checklists/visit-checklist';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRight, CalendarDays, ClipboardList, ListTodo, Plus, Search, ShieldCheck, Users } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type Named = { id: number; name: string };
+type RecordLookups = Partial<Record<'patients' | 'referrals' | 'providers' | 'missed_cases', Named[]>>;
 type RecordRow = {
     id: number;
     version: number;
@@ -33,6 +35,7 @@ type RecordRow = {
     description?: string;
     total_minor?: number;
     payments?: { amount_minor: number }[];
+    checklist?: VisitChecklist | null;
     items?: { id: number; description: string; quantity: number; total_minor: number }[];
     [key: string]: unknown;
 };
@@ -185,7 +188,7 @@ function RecordForm({
 }: {
     module: string;
     row?: RecordRow;
-    lookups: Record<string, Named[]>;
+    lookups: RecordLookups;
     staff: Named[];
     onClose: () => void;
     payment?: boolean;
@@ -200,7 +203,9 @@ function RecordForm({
     const [busy, setBusy] = useState(false);
     const [requestId] = useState(() => crypto.randomUUID());
     const [items, setItems] = useState([{ description: '', quantity: '1', unit_price_minor: '' }]);
-    const targets = row ? (paths[module]?.[row.status] ?? []) : [];
+    const targets = row
+        ? (paths[module]?.[row.status] ?? []).filter((status) => status !== 'completed' || !row.checklist || !!row.checklist.submitted_at)
+        : [];
     const fields: Field[] = editDetails
         ? schemas.patients
         : payment
@@ -289,7 +294,7 @@ function RecordForm({
                                     field={field}
                                     value={values[field.key] ?? ''}
                                     onChange={(v) => setValues({ ...values, [field.key]: v })}
-                                    options={field.choices === 'staff' ? staff : (lookups[field.choices ?? ''] ?? [])}
+                                    options={field.choices === 'staff' ? staff : (lookups[field.choices as keyof RecordLookups] ?? [])}
                                 />
                             </div>
                         ))}
@@ -431,7 +436,7 @@ export default function Operations({
     rows: Page<RecordRow> | null;
     summary: Record<string, number> | null;
     staff: Named[];
-    lookups: Record<string, Named[]>;
+    lookups: RecordLookups & { checklists?: ChecklistOption[] };
     applications: Page<Application> | null;
     members: Member[];
     events: Page<{ id: number; event: string; actor_name: string; created_at: string; resource_type: string; resource_id: number }> | null;
@@ -441,6 +446,7 @@ export default function Operations({
 }) {
     const [creating, setCreating] = useState(false);
     const [editing, setEditing] = useState<RecordRow>();
+    const [attachingChecklist, setAttachingChecklist] = useState<RecordRow>();
     const [paying, setPaying] = useState<RecordRow>();
     const [addingMember, setAddingMember] = useState(false);
     const [memberValues, setMemberValues] = useState({ email: '', role: 'coordinator', approval_evidence: '' });
@@ -675,6 +681,11 @@ export default function Operations({
                                         </TableCell>
                                         <TableCell>
                                             <Status value={row.status} />
+                                            {row.checklist && (
+                                                <p className="text-muted-foreground mt-1 text-xs">
+                                                    {row.checklist.submitted_at ? 'Checklist signed' : 'Checklist awaiting submission'}
+                                                </p>
+                                            )}
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <div className="flex flex-wrap justify-end gap-2">
@@ -696,6 +707,17 @@ export default function Operations({
                                                         Update status
                                                     </Button>
                                                 )}
+                                                {module === 'appointments' &&
+                                                    (row.checklist ? (
+                                                        <VisitChecklistButton checklist={row.checklist} visitId={row.id} visitVersion={row.version} />
+                                                    ) : (
+                                                        ['booked', 'confirmed'].includes(row.status) &&
+                                                        !!lookups.checklists?.length && (
+                                                            <Button variant="outline" size="sm" onClick={() => setAttachingChecklist(row)}>
+                                                                Attach checklist
+                                                            </Button>
+                                                        )
+                                                    ))}
                                                 {module === 'invoices' && ['issued', 'part_paid'].includes(row.status) && (
                                                     <Button size="sm" onClick={() => setPaying(row)}>
                                                         Reconcile
@@ -722,6 +744,14 @@ export default function Operations({
                         </Table>
                         <Pagination links={rows.links} />
                     </section>
+                )}
+                {attachingChecklist && (
+                    <AttachVisitChecklist
+                        visitId={attachingChecklist.id}
+                        visitVersion={attachingChecklist.version}
+                        options={lookups.checklists ?? []}
+                        onClose={() => setAttachingChecklist(undefined)}
+                    />
                 )}
                 {module === 'team' && (
                     <div>

@@ -20,6 +20,7 @@ use App\Http\Controllers\OperationsController;
 use App\Http\Controllers\PatientRecordController;
 use App\Http\Controllers\ProviderVisitController;
 use App\Http\Controllers\RosterController;
+use App\Http\Controllers\VisitChecklistController;
 use App\Http\Middleware\RequireWorkforceMfa;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -92,6 +93,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/patient-records/{id}/access/{rule}/revoke', [PatientRecordController::class, 'revoke']);
         Route::get('/search', GlobalSearchController::class)->middleware('throttle:60,1');
         Route::get('/my-visits', [ProviderVisitController::class, 'index']);
+        Route::post('/my-visits/{id}/checklist', [ProviderVisitController::class, 'submitChecklist'])->whereNumber('id');
         Route::post('/my-visits/{id}/attendance', [ProviderVisitController::class, 'attendance']);
         Route::post('/my-visits/{appointmentId}/attendance/{eventId}/corrections', [AttendanceReviewController::class, 'requestCorrection'])->whereNumber(['appointmentId', 'eventId']);
         Route::get('/my-roster', [RosterController::class, 'own']);
@@ -100,6 +102,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/my-visits/{appointmentId}/respond', [RosterController::class, 'respond'])->whereNumber('appointmentId');
         Route::get('/workspace/roster', [RosterController::class, 'workspace']);
         Route::post('/workspace/roster/{entryId}/review', [RosterController::class, 'review'])->whereNumber('entryId');
+        Route::post('/workspace/appointments/{id}/checklist', [VisitChecklistController::class, 'attach'])->whereNumber('id');
         Route::post('/workspace/appointments/{appointmentId}/missed', [MissedVisitController::class, 'mark'])->whereNumber('appointmentId');
         Route::post('/workspace/missed-visits/{caseId}/welfare', [MissedVisitController::class, 'welfare'])->whereNumber('caseId');
         Route::post('/workspace/missed-visits/{caseId}/waive-replacement', [MissedVisitController::class, 'waiveReplacement'])->whereNumber('caseId');

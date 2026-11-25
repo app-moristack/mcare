@@ -27,6 +27,19 @@ class Appointment extends Model
         return $this->belongsTo(User::class, 'provider_id');
     }
 
+    public function checklist()
+    {
+        return $this->hasOne(VisitChecklist::class);
+    }
+
+    public function canSubmitChecklist(): bool
+    {
+        return $this->status === 'arrived' && $this->offer_status === 'accepted'
+            && ($this->relationLoaded('attendance')
+                ? $this->attendance->contains('kind', 'arrival')
+                : $this->attendance()->where('kind', 'arrival')->exists());
+    }
+
     public function attendance()
     {
         return $this->hasMany(AttendanceEvent::class);

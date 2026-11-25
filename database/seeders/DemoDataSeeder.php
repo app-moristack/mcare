@@ -466,6 +466,23 @@ class DemoDataSeeder extends Seeder
                     ]);
                 }
             }
+            $demoChecklistVisitStart = now('Indian/Mauritius')->addDays(2)->setTime(16, 30)->utc();
+            $demoChecklistVisit = Appointment::firstOrCreate(['organisation_id' => $org->id, 'request_id' => $this->uuid('visit-with-sop')], [
+                'patient_id' => $patients[2]->id, 'referral_id' => $visits[2]->referral_id,
+                'provider_id' => $users['nurse']->id, 'service' => 'Demo visit with operational checklist',
+                'starts_at' => $demoChecklistVisitStart, 'ends_at' => $demoChecklistVisitStart->copy()->addMinutes(30),
+                'location_type' => 'clinic', 'location' => 'Synthetic demo clinic',
+                'status' => 'confirmed', 'confirmation_evidence' => 'Synthetic coordination confirmation.',
+                'offer_status' => 'accepted', 'offered_at' => now()->subHour(), 'offer_responded_at' => now(),
+                'offer_evidence' => 'Synthetic provider acceptance.',
+            ]);
+            $demoChecklistVersion = $checklist->currentPublication()->firstOrFail();
+            $demoChecklistVisit->checklist()->firstOrCreate([], [
+                'checklist_version_id' => $demoChecklistVersion->id, 'title' => $checklist->title,
+                'version' => $demoChecklistVersion->version, 'steps' => $demoChecklistVersion->steps, 'source_hash' => $demoChecklistVersion->content_hash,
+                'attached_by' => $users['coordinator']->id, 'attach_request_id' => $this->uuid('visit-with-sop-attachment'),
+                'attached_at' => now(),
+            ]);
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {
                 DB::table('audit_events')->insert(['organisation_id' => $org->id, 'actor_id' => $admin->id, 'event' => 'demo.seeded', 'created_at' => now()]);

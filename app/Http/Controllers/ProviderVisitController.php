@@ -21,7 +21,67 @@ class ProviderVisitController extends Controller
     {
         $orgs = Workspace::memberships($r->user())->whereIn('role', ['doctor', 'nurse', 'carer', 'physiotherapist'])->pluck('organisation_id');
 
-        return Inertia::render('care/visits', ['visits' => Appointment::where('provider_id', $r->user()->id)->whereIn('organisation_id', $orgs)->with(['patient:id,name,reference', 'attendance.review', 'attendance.corrections' => fn ($query) => $query->latest()])->orderByDesc('starts_at')->paginate(15)]);
+        $visits = Appointment::where('provider_id', $r->user()->id)->whereIn('organisation_id', $orgs)
+            ->with(['patient:id,name,reference', 'attendance.review', 'attendance.corrections' => fn ($query) => $query->latest(), 'checklist'])
+            ->orderByDesc('starts_at')->paginate(15)->through(fn (Appointment $visit) => [
+                ...$visit->toArray(),
+                'checklist' => $visit->checklist?->forPage($visit->canSubmitChecklist()),
+            ]);
+
+        return Inertia::render('care/visits', ['visits' => $visits]);
+    }
+
+    public function submitChecklist(Request $r, int $id)
+    {
+        $data = $r->validate([
+            'visit_version' => 'required|integer|min:1',
+            'request_id' => 'required|uuid',
+            'responses' => 'required|array|list|min:1|max:40',
+            'responses.*' => 'required|array:status,reason',
+            'responses.*.status' => 'required|in:completed,exception',
+            'responses.*.reason' => 'nullable|required_if:responses.*.status,exception|prohibited_if:responses.*.status,completed|string|max:2000',
+            'password' => 'required|current_password',
+            'declaration' => 'accepted',
+        ]);
+
+        DB::transaction(function () use ($r, $id, $data) {
+            $visit = Appointment::lockForUpdate()->findOrFail($id);
+            $this->allowed($r, $visit);
+            $checklist = $visit->checklist()->lockForUpdate()->firstOrFail();
+            $responses = array_map(fn (array $step) => ['status' => $step['status'], 'reason' => $step['reason'] ?? null], $data['responses']);
+            if ($checklist->submitted_at !== null) {
+                abort_unless($checklist->submission_request_id === $data['request_id'] && $checklist->submitted_by === $r->user()->id
+                    && $checklist->responses === $responses, 409, 'This visit checklist has already been signed.');
+
+                return;
+            }
+
+            abort_unless($visit->version === (int) $data['visit_version'] && $visit->canSubmitChecklist(),
+                409,
+                'Reload the visit before signing. The accepted visit must have a recorded arrival.'
+            );
+            if (count($responses) !== count($checklist->steps)) {
+                throw ValidationException::withMessages(['responses' => 'Record an outcome for every attached checklist step.']);
+            }
+            $source = $checklist->sourceVersion;
+            abort_unless($source && $source->status === 'published' && $source->version === $checklist->version
+                && $source->steps === $checklist->steps && hash_equals($checklist->source_hash, $source->digest()),
+                409,
+                'Checklist source integrity check failed.'
+            );
+            $signer = $r->user()->id;
+            $checklist->update([
+                'responses' => $responses,
+                'submitted_by' => $signer,
+                'submission_request_id' => $data['request_id'],
+                'submitted_at' => now(),
+                'submission_hash' => $checklist->digest($responses, $signer),
+            ]);
+            $visit->increment('version');
+            Workspace::audit($r, 'visit.checklist.signed', $visit->organisation_id, 'appointments', $visit->id);
+        }, 3);
+
+        return back()->with('success', 'Visit checklist signed and retained.');
     }
 
     public function attendance(Request $r, int $id)

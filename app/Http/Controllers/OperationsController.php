@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AccountApplication;
 use App\Models\Appointment;
 use App\Models\CareTask;
+use App\Models\ChecklistTemplate;
 use App\Models\Invoice;
 use App\Models\MissedVisitCase;
 use App\Models\Patient;
@@ -88,7 +89,7 @@ class OperationsController extends Controller
                 $query->with('patient:id,name,reference');
             }
             if ($module === 'appointments') {
-                $query->with(['provider:id,name', 'attendance']);
+                $query->with(['provider:id,name', 'attendance', 'checklist']);
             }
             if ($module === 'tasks') {
                 $query->with(['owner:id,name', 'backup:id,name']);
@@ -98,6 +99,9 @@ class OperationsController extends Controller
             }
         }
         $rows = $query?->latest('id')->paginate(15)->withQueryString();
+        if ($module === 'appointments') {
+            $rows->through(fn (Appointment $visit) => [...$visit->toArray(), 'checklist' => $visit->checklist?->forPage()]);
+        }
         $staff = Workspace::staff($org)->select('id', 'name')->orderBy('name')->get();
         $lookups = [];
         if (in_array($module, ['referrals', 'appointments', 'tasks', 'invoices'])) {
@@ -106,6 +110,10 @@ class OperationsController extends Controller
         if ($module === 'appointments') {
             $lookups['referrals'] = Referral::where('organisation_id', $org)->whereIn('status', ['awaiting_match', 'assessment_booked'])->with('patient:id,name')->get()->map(fn ($x) => ['id' => $x->id, 'name' => '#'.$x->id.' · '.$x->patient->name, 'patient_id' => $x->patient_id]);
             $lookups['providers'] = Workspace::staff($org)->when(config('mauricare.workforce_mfa_required'), fn ($q) => $q->whereNotNull('mfa_confirmed_at'))->whereHas('memberships', fn ($q) => $q->where('organisation_id', $org)->whereIn('role', ['doctor', 'nurse', 'carer', 'physiotherapist'])->where('status', 'active'))->select('id', 'name')->get();
+            $lookups['checklists'] = ChecklistTemplate::where('organisation_id', $org)->whereHas('currentPublication')
+                ->with('currentPublication')->orderBy('title')->get()->map(fn (ChecklistTemplate $template) => [
+                    'id' => $template->currentPublication->id, 'title' => $template->title, 'version' => $template->currentPublication->version,
+                ]);
             $lookups['missed_cases'] = MissedVisitCase::where('organisation_id', $org)->where('status', 'open')->where('replacement_status', 'required')->with('patient:id,name')->get()->map(fn ($case) => ['id' => $case->id, 'name' => '#'.$case->id.' · '.$case->patient->name, 'patient_id' => $case->patient_id]);
         }
         $summary = $module === 'overview' ? [
@@ -302,6 +310,9 @@ class OperationsController extends Controller
                     }
                 }
                 if ($status === 'completed') {
+                    if ($record->checklist()->whereNull('submitted_at')->exists()) {
+                        $this->fail('status', 'The assigned provider must sign the attached visit checklist before completion.');
+                    }
                     if ($record->attendance()->count() !== 2) {
                         $this->fail('status', 'Arrival and departure events are required.');
                     }
