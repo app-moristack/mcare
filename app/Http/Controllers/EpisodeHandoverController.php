@@ -6,6 +6,7 @@ use App\Models\CareEpisode;
 use App\Models\EpisodeHandover;
 use App\Models\Patient;
 use App\Services\EpisodeHandovers;
+use App\Services\HandoverResultTransfers;
 use App\Services\HandoverTaskTransfers;
 use App\Services\PatientAccess;
 use App\Services\Workspace;
@@ -32,6 +33,12 @@ class EpisodeHandoverController extends Controller
         PatientAccess::enforce($request, $patient, $scope);
     }
 
+    private function transferSelection(array $selection): array
+    {
+        return collect($selection)->map(fn (array $item) => ['id' => (int) $item['id'], 'version' => (int) $item['version']])
+            ->sortBy('id')->values()->all();
+    }
+
     public function store(Request $request, int $id, int $episode)
     {
         $patient = $this->patient($request, $id);
@@ -49,6 +56,10 @@ class EpisodeHandoverController extends Controller
             'transfer_tasks.*' => 'required|array:id,version',
             'transfer_tasks.*.id' => 'required|integer|min:1|distinct',
             'transfer_tasks.*.version' => 'required|integer|min:1',
+            'transfer_results' => 'sometimes|array|list|max:20',
+            'transfer_results.*' => 'required|array:id,version',
+            'transfer_results.*.id' => 'required|integer|min:1|distinct',
+            'transfer_results.*.version' => 'required|integer|min:1',
             'password' => 'required|current_password',
             'declaration' => 'accepted',
         ]);
@@ -61,15 +72,17 @@ class EpisodeHandoverController extends Controller
             $recipientId = (int) $data['recipient_id'];
             $content = Arr::only($data, ['situation', 'background', 'assessment', 'recommendation']);
             $dueAt = CarbonImmutable::createFromFormat('!Y-m-d\TH:i', $data['due_at'], config('mauricare.time_zone'))->utc();
-            $selection = collect($data['transfer_tasks'] ?? [])->map(fn (array $task) => ['id' => (int) $task['id'], 'version' => (int) $task['version']])
-                ->sortBy('id')->values()->all();
+            $selection = $this->transferSelection($data['transfer_tasks'] ?? []);
+            $resultSelection = $this->transferSelection($data['transfer_results'] ?? []);
             $existing = EpisodeHandover::where('care_episode_id', $record->id)->where('sender_id', $sender)
                 ->where('request_id', $data['request_id'])->first();
             if ($existing) {
-                $existingSelection = collect($existing->transfer_tasks)->map(fn (array $task) => Arr::only($task, ['id', 'version']))->all();
+                $existingSelection = $this->transferSelection($existing->transfer_tasks ?? []);
+                $existingResults = $this->transferSelection($existing->transfer_results ?? []);
                 abort_unless(
                     $existing->recipient_id === $recipientId && $existing->content === $content
-                        && $existing->priority === $data['priority'] && $existing->due_at->equalTo($dueAt) && $existingSelection === $selection,
+                        && $existing->priority === $data['priority'] && $existing->due_at->equalTo($dueAt)
+                        && $existingSelection === $selection && $existingResults === $resultSelection,
                     409,
                     'This request already recorded a different handover.'
                 );
@@ -96,6 +109,21 @@ class EpisodeHandoverController extends Controller
                     ->map(fn ($task) => $task->only(['id', 'version', 'title']))->all();
             }
 
+            $transferResults = [];
+            if ($resultSelection !== []) {
+                if (! HandoverResultTransfers::canAccept($request->user(), $patient)) {
+                    throw ValidationException::withMessages(['transfer_results' => 'Current investigation result authority is required to propose a transfer.']);
+                }
+                if (! HandoverResultTransfers::canAccept($recipient, $patient)) {
+                    throw ValidationException::withMessages(['recipient_id' => 'Choose a current assigned doctor with result follow-up authority.']);
+                }
+                [$results, $tasks] = HandoverResultTransfers::lock($patient, $sender, $recipient, $resultSelection);
+                $transferResults = $results->map(fn ($result) => [
+                    'id' => $result->id, 'version' => $result->version, 'title' => HandoverResultTransfers::title($result),
+                    'task_id' => $result->task_id, 'task_version' => $tasks[$result->task_id]->version,
+                ])->all();
+            }
+
             $handover = EpisodeHandover::create([
                 'care_episode_id' => $record->id,
                 'sender_id' => $sender,
@@ -105,6 +133,7 @@ class EpisodeHandoverController extends Controller
                 'priority' => $data['priority'],
                 'due_at' => $dueAt,
                 'transfer_tasks' => $transferTasks,
+                'transfer_results' => $transferResults,
             ]);
             DB::table('operation_notifications')->insert([
                 'organisation_id' => $patient->organisation_id,
@@ -138,7 +167,9 @@ class EpisodeHandoverController extends Controller
             $entry = EpisodeHandover::where('care_episode_id', $record->id)
                 ->where('recipient_id', $request->user()->id)->lockForUpdate()->findOrFail($handover);
 
-            if (! empty($entry->transfer_tasks)) {
+            $transferTasks = $entry->transfer_tasks ?? [];
+            $transferResults = $entry->transfer_results ?? [];
+            if ($transferTasks !== [] || $transferResults !== []) {
                 $request->validate(['accept_transfer' => 'accepted']);
             }
 
@@ -148,13 +179,31 @@ class EpisodeHandoverController extends Controller
                 return;
             }
 
-            if (! empty($entry->transfer_tasks)) {
+            if (($transferTasks !== [] || $transferResults !== [])
+                && (! EpisodeHandovers::canRead($entry->sender, $patient) || ! PatientAccess::allowed($entry->sender, $patient, 'handover.write'))) {
+                $field = $transferTasks !== [] ? 'transfer_tasks' : 'transfer_results';
+
+                throw ValidationException::withMessages([$field => 'The sender no longer has authority for this transfer. Review the outstanding work.']);
+            }
+
+            $tasks = null;
+            if ($transferTasks !== []) {
                 abort_unless(HandoverTaskTransfers::canAccept($request->user(), $patient), 403, 'Current task management permission is required to accept this transfer.');
-                if (! EpisodeHandovers::canRead($entry->sender, $patient) || ! PatientAccess::allowed($entry->sender, $patient, 'handover.write')) {
-                    throw ValidationException::withMessages(['transfer_tasks' => 'The sender no longer has authority for this transfer. Review the outstanding tasks.']);
+                $tasks = HandoverTaskTransfers::lock($patient, $entry->sender_id, $request->user(), $transferTasks);
+            }
+            $results = null;
+            if ($transferResults !== []) {
+                abort_unless(HandoverResultTransfers::canAccept($request->user(), $patient), 403, 'Current result follow-up authority is required to accept this transfer.');
+                if (! HandoverResultTransfers::canAccept($entry->sender, $patient)) {
+                    throw ValidationException::withMessages(['transfer_results' => 'The sender no longer has result follow-up authority. Review the outstanding results.']);
                 }
-                $tasks = HandoverTaskTransfers::lock($patient, $entry->sender_id, $request->user(), $entry->transfer_tasks);
+                $results = HandoverResultTransfers::lock($patient, $entry->sender_id, $request->user(), $transferResults, verifySignedTask: true);
+            }
+            if ($tasks) {
                 HandoverTaskTransfers::accept($request, $patient, $tasks);
+            }
+            if ($results) {
+                HandoverResultTransfers::accept($request, $patient, $results);
             }
 
             $entry->update(['acknowledgement' => $data['acknowledgement'], 'acknowledged_at' => now()]);

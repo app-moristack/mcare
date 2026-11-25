@@ -20,6 +20,7 @@ type Result = {
     id: number;
     investigation_id: number;
     owner_id: number;
+    effective_owner_id: number;
     backup_id: number;
     supersedes_id: number | null;
     received_at: string;
@@ -52,6 +53,7 @@ type Result = {
     investigation?: { id: number; category: string; name: string };
     receiver: Person;
     owner: Person;
+    effective_owner: Person;
     backup: Person;
     published_at?: string;
 };
@@ -134,7 +136,7 @@ function ResultActions({
         event.preventDefault();
         publication.post(`/patient-records/${patientId}/investigations/results/${row.id}/publish`, { preserveScroll: true });
     };
-    const owner = row.owner_id === currentUserId;
+    const owner = row.effective_owner_id === currentUserId;
     return (
         <div className="space-y-4">
             {canAcknowledge && owner && row.status === 'pending' && !superseded && (
@@ -786,9 +788,15 @@ export default function Investigations({
                                     </div>
                                     <dl className="grid gap-2 text-sm sm:grid-cols-2">
                                         <div>
-                                            <dt className="text-muted-foreground text-xs">Owner</dt>
-                                            <dd>{row.owner?.name}</dd>
+                                            <dt className="text-muted-foreground text-xs">Current follow-up owner</dt>
+                                            <dd className="break-words">{row.effective_owner?.name}</dd>
                                         </div>
+                                        {row.effective_owner_id !== row.owner_id && (
+                                            <div>
+                                                <dt className="text-muted-foreground text-xs">Owner at signing</dt>
+                                                <dd className="break-words">{row.owner?.name}</dd>
+                                            </div>
+                                        )}
                                         <div>
                                             <dt className="text-muted-foreground text-xs">Operational backup</dt>
                                             <dd>{row.backup?.name}</dd>

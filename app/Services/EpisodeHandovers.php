@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\EpisodeHandover;
+use App\Models\InvestigationResult;
 use App\Models\Patient;
 use App\Models\PatientAccessRule;
 use App\Models\User;
@@ -42,12 +43,20 @@ class EpisodeHandovers
                 ->map(fn (User $candidate) => [
                     ...$candidate->only(['id', 'name']),
                     'canAcceptTransfers' => HandoverTaskTransfers::canAccept($candidate, $patient),
+                    'canAcceptResultTransfers' => HandoverResultTransfers::canAccept($candidate, $patient),
                 ])
                 ->values()
             : [];
 
         $transferTasks = $canCreate ? HandoverTaskTransfers::available($patient, $user->id)->orderBy('id')->get(['id', 'title', 'version']) : [];
         $canAcceptTransfers = HandoverTaskTransfers::canAccept($user, $patient);
+        $canAcceptResultTransfers = HandoverResultTransfers::canAccept($user, $patient);
+        $transferResults = $canCreate && $canAcceptResultTransfers
+            ? HandoverResultTransfers::available($patient, $user->id)->orderBy('id')->get()
+                ->filter(HandoverResultTransfers::isOutstanding(...))
+                ->map(fn (InvestigationResult $result) => ['id' => $result->id, 'title' => HandoverResultTransfers::title($result), 'version' => $result->version])
+                ->values()
+            : [];
         $records = EpisodeHandover::whereHas('episode', fn ($query) => $query->where('patient_id', $patient->id))
             ->where(fn ($query) => $query->where('sender_id', $user->id)->orWhere('recipient_id', $user->id))
             ->with(['sender:id,name', 'recipient:id,name'])
@@ -63,14 +72,16 @@ class EpisodeHandovers
                 'acknowledged_at' => $record->acknowledged_at,
                 'acknowledgement' => $record->acknowledgement,
                 'transfer_tasks' => collect($record->transfer_tasks)->map(fn (array $task) => ['id' => $task['id'], 'title' => $task['title']])->all(),
+                'transfer_results' => collect($record->transfer_results)->map(fn (array $result) => ['id' => $result['id'], 'title' => $result['title']])->all(),
                 'canAcknowledge' => $canAcknowledge && $record->recipient_id === $user->id && $record->acknowledged_at === null
-                    && (empty($record->transfer_tasks) || $canAcceptTransfers),
+                    && (empty($record->transfer_tasks) || $canAcceptTransfers)
+                    && (empty($record->transfer_results) || $canAcceptResultTransfers),
             ]);
 
         if ($records->isNotEmpty()) {
             Workspace::audit($request, 'clinical.handover.viewed', $patient->organisation_id, 'patients', $patient->id);
         }
 
-        return ['canCreate' => $canCreate, 'recipients' => $recipients, 'records' => $records, 'transferTasks' => $transferTasks];
+        return ['canCreate' => $canCreate, 'recipients' => $recipients, 'records' => $records, 'transferTasks' => $transferTasks, 'transferResults' => $transferResults];
     }
 }

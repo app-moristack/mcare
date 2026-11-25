@@ -39,6 +39,21 @@ class InvestigationResult extends Model
         return $this->belongsTo(User::class, 'owner_id');
     }
 
+    public function effectiveOwnerId(): int
+    {
+        return $this->follow_up_owner_id ?? $this->owner_id;
+    }
+
+    public function followUpOwner()
+    {
+        return $this->belongsTo(User::class, 'follow_up_owner_id');
+    }
+
+    public function trackingTask()
+    {
+        return $this->belongsTo(CareTask::class, 'task_id');
+    }
+
     public function backup()
     {
         return $this->belongsTo(User::class, 'backup_id');

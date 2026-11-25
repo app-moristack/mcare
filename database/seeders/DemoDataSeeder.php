@@ -381,7 +381,7 @@ class DemoDataSeeder extends Seeder
             }
             $this->call(ClinicalRecordDemoSeeder::class);
             $handoverEpisode = CareEpisode::where('patient_id', $patients[0]->id)->firstOrFail();
-            foreach (['nurse', 'lead'] as $key) {
+            foreach (['nurse', 'doctor', 'lead'] as $key) {
                 foreach (['handover.read', 'handover.write', 'handover.acknowledge'] as $scope) {
                     PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('handover-'.$key.'-'.$scope)], [
                         'patient_id' => $patients[0]->id, 'user_id' => $users[$key]->id,
@@ -392,6 +392,19 @@ class DemoDataSeeder extends Seeder
                     ]);
                 }
             }
+            PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('result-transfer-lead-assignment')], [
+                'patient_id' => $patients[0]->id, 'user_id' => $users['lead']->id, 'kind' => 'assignment', 'scope' => 'all',
+                'role' => 'doctor', 'purpose' => 'Synthetic result follow-up transfer', 'authority_type' => 'care_assignment',
+                'evidence' => 'Synthetic named doctor assignment; not real care authority.',
+                'wording_version' => 'DEMO-v1', 'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(),
+                'recorded_by' => $admin->id,
+            ]);
+            PatientAccessRule::firstOrCreate(['request_id' => $this->uuid('result-transfer-lead-acknowledge')], [
+                'patient_id' => $patients[0]->id, 'user_id' => $users['lead']->id, 'kind' => 'grant', 'scope' => 'results.acknowledge',
+                'purpose' => 'Synthetic result follow-up transfer', 'authority_type' => 'patient_consent',
+                'evidence' => 'Synthetic authority only.', 'wording_version' => 'DEMO-v1',
+                'starts_at' => now()->subDay(), 'ends_at' => now()->addYear(), 'recorded_by' => $admin->id,
+            ]);
             EpisodeHandover::firstOrCreate(['request_id' => $this->uuid('sbar-handover'), 'care_episode_id' => $handoverEpisode->id, 'sender_id' => $users['lead']->id], [
                 'recipient_id' => $users['nurse']->id,
                 'content' => [

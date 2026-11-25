@@ -71,7 +71,10 @@ class EpisodeHandoverTest extends TestCase
     {
         $data = $this->payload();
         $this->inWorkspace($this->lead)->get($this->clinicalPage)
-            ->assertInertia(fn (Assert $page) => $page->where('handover.recipients', [[...$this->nurse->only(['id', 'name']), 'canAcceptTransfers' => false]]));
+            ->assertInertia(fn (Assert $page) => $page->where('handover.recipients', [
+                [...User::where('email', 'demo.doctor@example.test')->firstOrFail()->only(['id', 'name']), 'canAcceptTransfers' => false, 'canAcceptResultTransfers' => true],
+                [...$this->nurse->only(['id', 'name']), 'canAcceptTransfers' => false, 'canAcceptResultTransfers' => false],
+            ]));
         $this->post($this->handovers, $data)->assertSessionHasNoErrors();
         $this->post($this->handovers, $data)->assertSessionHasNoErrors();
         $this->postJson($this->handovers, [...$data, 'situation' => 'A different situation'])->assertConflict();
@@ -111,7 +114,7 @@ class EpisodeHandoverTest extends TestCase
 
     public function test_sender_and_recipient_must_hold_current_patient_specific_authority(): void
     {
-        $doctor = User::where('email', 'demo.doctor@example.test')->firstOrFail();
+        $doctor = User::where('email', 'demo.physio@example.test')->firstOrFail();
         $this->inWorkspace($this->lead)->postJson($this->handovers, $this->payload(['recipient_id' => $doctor->id]))
             ->assertUnprocessable()->assertJsonValidationErrors('recipient_id');
         $this->postJson($this->handovers, $this->payload(['recipient_id' => $this->lead->id]))->assertUnprocessable()->assertJsonValidationErrors('recipient_id');
@@ -135,7 +138,7 @@ class EpisodeHandoverTest extends TestCase
 
     public function test_read_scopes_do_not_disclose_an_unaddressed_handover_or_publish_it_to_the_patient(): void
     {
-        $doctor = User::where('email', 'demo.doctor@example.test')->firstOrFail();
+        $doctor = User::where('email', 'demo.physio@example.test')->firstOrFail();
         $grant = PatientAccessRule::where('user_id', $this->nurse->id)->where('patient_id', $this->patient->id)
             ->where('scope', 'handover.read')->firstOrFail()->replicate();
         $grant->fill(['user_id' => $doctor->id, 'request_id' => Str::uuid()->toString()])->save();
@@ -166,7 +169,10 @@ class EpisodeHandoverTest extends TestCase
         $this->inWorkspace($this->nurse)->get($this->clinicalPage)
             ->assertInertia(fn (Assert $page) => $page
                 ->where('handover.transferTasks', [$task->only(['id', 'title', 'version'])])
-                ->where('handover.recipients', [[...$this->lead->only(['id', 'name']), 'canAcceptTransfers' => true]]));
+                ->where('handover.recipients', [
+                    [...User::where('email', 'demo.doctor@example.test')->firstOrFail()->only(['id', 'name']), 'canAcceptTransfers' => false, 'canAcceptResultTransfers' => true],
+                    [...$this->lead->only(['id', 'name']), 'canAcceptTransfers' => true, 'canAcceptResultTransfers' => true],
+                ]));
         $this->post($this->handovers, $data)->assertSessionHasNoErrors();
         $this->post($this->handovers, $data)->assertSessionHasNoErrors();
         $this->postJson($this->handovers, [...$data, 'transfer_tasks' => []])->assertConflict();
@@ -289,5 +295,129 @@ class EpisodeHandoverTest extends TestCase
         $this->assertDatabaseHas('care_tasks', ['id' => $ordinary->id, 'handover_transferable' => true]);
         $this->assertDatabaseHas('care_tasks', ['id' => $unknown->id, 'handover_transferable' => false]);
         $this->assertDatabaseHas('care_tasks', ['id' => $critical->id, 'handover_transferable' => false]);
+    }
+
+    public function test_result_transfer_preserves_signed_receipt_and_hands_off_existing_follow_up(): void
+    {
+        $doctor = User::where('email', 'demo.doctor@example.test')->firstOrFail();
+        $result = InvestigationResult::firstOrFail();
+        $tracking = CareTask::findOrFail($result->task_id);
+        $version = $result->version;
+        $taskVersion = $tracking->version;
+        $hash = $result->content_hash;
+        $oldAlert = 'result-received:'.$result->id.':'.$doctor->id;
+        DB::table('operation_notifications')->insert([
+            'organisation_id' => $this->patient->organisation_id, 'user_id' => $doctor->id,
+            'message' => 'Synthetic result follow-up notice.', 'url' => '/patient-records/'.$this->patient->id.'/investigations',
+            'deduplication_key' => $oldAlert, 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $selection = [$result->only(['id', 'version'])];
+        $offer = $this->payload(['recipient_id' => $this->lead->id, 'transfer_results' => $selection]);
+
+        $this->inWorkspace($doctor)->get($this->clinicalPage)
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('handover.transferResults', [['id' => $result->id, 'title' => 'Investigation result #'.$result->id, 'version' => $result->version]])
+                ->where('handover.recipients.0.canAcceptResultTransfers', true));
+        $this->post($this->handovers, $offer)->assertSessionHasNoErrors();
+        $this->post($this->handovers, $offer)->assertSessionHasNoErrors();
+        $this->postJson($this->handovers, [...$offer, 'transfer_results' => []])->assertConflict();
+        $this->assertSame($doctor->id, $result->fresh()->effectiveOwnerId());
+        $this->assertSame($doctor->id, $tracking->fresh()->owner_id);
+        $handover = EpisodeHandover::where('request_id', $offer['request_id'])->firstOrFail();
+        $this->assertStringNotContainsString('Investigation result #'.$result->id, $handover->getRawOriginal('transfer_results'));
+
+        $this->inWorkspace($this->lead)->get($this->clinicalPage)
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('handover.records.0.transfer_results', [['id' => $result->id, 'title' => 'Investigation result #'.$result->id]])
+                ->where('handover.records.0.canAcknowledge', true));
+        $accept = $this->handovers.'/'.$handover->id.'/acknowledge';
+        $signature = ['password' => DemoDataSeeder::PASSWORD, 'declaration' => true];
+        $ack = ['acknowledgement' => 'Synthetic result follow-up accepted.', ...$signature];
+        $this->postJson($accept, $ack)->assertUnprocessable()->assertJsonValidationErrors('accept_transfer');
+        $this->post($accept, [...$ack, 'accept_transfer' => true])->assertSessionHasNoErrors();
+        $this->post($accept, [...$ack, 'accept_transfer' => true])->assertSessionHasNoErrors();
+
+        $changed = $result->fresh();
+        $this->assertSame($doctor->id, $changed->owner_id);
+        $this->assertSame($this->lead->id, $changed->effectiveOwnerId());
+        $this->assertSame($hash, $changed->content_hash);
+        $this->assertSame($hash, $changed->digest());
+        $this->assertSame($result->acknowledged_by, $changed->acknowledged_by);
+        $this->assertSame($result->getRawOriginal('details'), $changed->getRawOriginal('details'));
+        $this->assertSame($version + 1, $changed->version);
+        $this->assertSame($taskVersion + 1, $tracking->fresh()->version);
+        $this->assertSame($this->lead->id, $tracking->fresh()->owner_id);
+        $this->assertSame($tracking->backup_id, $tracking->fresh()->backup_id);
+        $this->assertNotNull(DB::table('operation_notifications')->where('deduplication_key', $oldAlert)->value('read_at'));
+        $this->assertDatabaseHas('operation_notifications', ['user_id' => $this->lead->id, 'deduplication_key' => 'result-transferred:'.$result->id.':'.$changed->version]);
+        $this->assertSame(1, DB::table('audit_events')->where('event', 'clinical.handover.result_transferred')->where('resource_id', $result->id)->count());
+
+        $work = '/patient-records/'.$this->patient->id.'/investigations';
+        $this->get($work)->assertInertia(fn (Assert $page) => $page
+            ->where('results.0.owner_id', $doctor->id)
+            ->where('results.0.effective_owner_id', $this->lead->id));
+        $complete = $work.'/results/'.$result->id.'/complete';
+        $completion = ['version' => $changed->version, 'outcome' => 'Synthetic follow-up completed.', 'evidence' => 'Synthetic record only.', ...$signature];
+        $this->inWorkspace($doctor)->postJson($complete, $completion)->assertConflict();
+        $this->inWorkspace($this->lead)->post($complete, $completion)->assertSessionHasNoErrors();
+        $this->assertSame($this->lead->id, $result->fresh()->completed_by);
+        $this->assertSame('completed', $tracking->fresh()->status);
+    }
+
+    public function test_changed_result_tracking_task_rejects_combined_transfer_without_moving_other_work(): void
+    {
+        $doctor = User::where('email', 'demo.doctor@example.test')->firstOrFail();
+        $result = InvestigationResult::firstOrFail();
+        $tracking = CareTask::findOrFail($result->task_id);
+        $ordinary = CareTask::where('title', 'Demo handover coordination task')->firstOrFail();
+        $ordinary->update(['owner_id' => $doctor->id]);
+        $offer = $this->payload([
+            'recipient_id' => $this->lead->id,
+            'transfer_tasks' => [$ordinary->only(['id', 'version'])],
+            'transfer_results' => [$result->only(['id', 'version'])],
+        ]);
+
+        $this->inWorkspace($doctor)->post($this->handovers, $offer)->assertSessionHasNoErrors();
+        $handover = EpisodeHandover::where('request_id', $offer['request_id'])->firstOrFail();
+        $tracking->increment('version');
+        $this->inWorkspace($this->lead)->postJson($this->handovers.'/'.$handover->id.'/acknowledge', [
+            'acknowledgement' => 'Synthetic combined acceptance.', 'password' => DemoDataSeeder::PASSWORD,
+            'declaration' => true, 'accept_transfer' => true,
+        ])->assertUnprocessable()->assertJsonValidationErrors('transfer_results');
+        $this->assertNull($handover->fresh()->acknowledged_at);
+        $this->assertSame($doctor->id, $result->fresh()->effectiveOwnerId());
+        $this->assertSame($doctor->id, $ordinary->fresh()->owner_id);
+        $this->assertSame($ordinary->version, $ordinary->fresh()->version);
+    }
+
+    public function test_nonroutine_or_corrected_results_and_revoked_result_authority_block_transfer(): void
+    {
+        $doctor = User::where('email', 'demo.doctor@example.test')->firstOrFail();
+        $result = InvestigationResult::firstOrFail();
+        $offer = $this->payload([
+            'recipient_id' => $this->lead->id,
+            'transfer_results' => [$result->only(['id', 'version'])],
+        ]);
+        $this->inWorkspace($doctor)->postJson($this->handovers, [...$offer, 'recipient_id' => $this->nurse->id])
+            ->assertUnprocessable()->assertJsonValidationErrors('recipient_id');
+
+        $result->update(['source_flag' => 'critical']);
+        $this->postJson($this->handovers, $offer)->assertUnprocessable()->assertJsonValidationErrors('transfer_results');
+        $result->update(['source_flag' => 'routine']);
+        $this->post($this->handovers, $offer)->assertSessionHasNoErrors();
+        $handover = EpisodeHandover::where('request_id', $offer['request_id'])->firstOrFail();
+        $accept = $this->handovers.'/'.$handover->id.'/acknowledge';
+        $ack = ['acknowledgement' => 'Synthetic result transfer acceptance.', 'password' => DemoDataSeeder::PASSWORD, 'declaration' => true, 'accept_transfer' => true];
+        $grant = PatientAccessRule::where('user_id', $this->lead->id)->where('patient_id', $this->patient->id)
+            ->where('scope', 'results.acknowledge')->firstOrFail();
+        $grant->update(['revoked_at' => now()]);
+        $this->inWorkspace($this->lead)->postJson($accept, $ack)->assertForbidden();
+
+        $grant->update(['revoked_at' => null]);
+        $correction = $result->replicate();
+        $correction->fill(['request_id' => Str::uuid()->toString(), 'supersedes_id' => $result->id, 'task_id' => null])->save();
+        $this->postJson($accept, $ack)->assertUnprocessable()->assertJsonValidationErrors('transfer_results');
+        $this->assertNull($handover->fresh()->acknowledged_at);
+        $this->assertSame($doctor->id, $result->fresh()->effectiveOwnerId());
     }
 }

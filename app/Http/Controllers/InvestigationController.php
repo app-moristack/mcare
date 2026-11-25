@@ -62,7 +62,7 @@ class InvestigationController extends Controller
         $canAcknowledge = PatientAccess::allowed($request->user(), $patient, 'results.acknowledge');
         $canPublish = PatientAccess::allowed($request->user(), $patient, 'results.publish');
         $investigations = Investigation::where('patient_id', $id)->with('requester:id,name')->latest('requested_at')->get()->map(fn (Investigation $row) => [...$row->only(['id', 'requested_at', 'category', 'details', 'content_hash']), 'requester' => $row->requester?->only(['id', 'name'])]);
-        $results = $canReadResults ? InvestigationResult::where('patient_id', $id)->with(['investigation:id,category,details', 'receiver:id,name', 'owner:id,name', 'backup:id,name', 'publication:id,investigation_result_id,published_at'])->latest('received_at')->get()->map(fn (InvestigationResult $row) => [...$row->only(['id', 'investigation_id', 'owner_id', 'backup_id', 'supersedes_id', 'task_id', 'received_at', 'source_reported_at', 'source_flag', 'details', 'correction_reason', 'status', 'acknowledgement', 'acknowledged_at', 'completion', 'completed_at', 'version', 'content_hash']), 'investigation' => $row->investigation ? ['id' => $row->investigation->id, 'category' => $row->investigation->category, 'name' => $row->investigation->details['name']] : null, 'receiver' => $row->receiver?->only(['id', 'name']), 'owner' => $row->owner?->only(['id', 'name']), 'backup' => $row->backup?->only(['id', 'name']), 'published_at' => $row->publication?->published_at]) : collect();
+        $results = $canReadResults ? InvestigationResult::where('patient_id', $id)->with(['investigation:id,category,details', 'receiver:id,name', 'owner:id,name', 'followUpOwner:id,name', 'backup:id,name', 'publication:id,investigation_result_id,published_at'])->latest('received_at')->get()->map(fn (InvestigationResult $row) => [...$row->only(['id', 'investigation_id', 'owner_id', 'backup_id', 'supersedes_id', 'task_id', 'received_at', 'source_reported_at', 'source_flag', 'details', 'correction_reason', 'status', 'acknowledgement', 'acknowledged_at', 'completion', 'completed_at', 'version', 'content_hash']), 'investigation' => $row->investigation ? ['id' => $row->investigation->id, 'category' => $row->investigation->category, 'name' => $row->investigation->details['name']] : null, 'receiver' => $row->receiver?->only(['id', 'name']), 'owner' => $row->owner?->only(['id', 'name']), 'effective_owner_id' => $row->effectiveOwnerId(), 'effective_owner' => ($row->followUpOwner ?? $row->owner)?->only(['id', 'name']), 'backup' => $row->backup?->only(['id', 'name']), 'published_at' => $row->publication?->published_at]) : collect();
         Workspace::audit($request, 'patient.investigations.viewed', $patient->organisation_id, 'patients', $patient->id);
 
         return Inertia::render('investigations/index', [
@@ -170,7 +170,7 @@ class InvestigationController extends Controller
             Patient::whereKey($patient->id)->lockForUpdate()->firstOrFail();
             PatientAccess::enforce($request, $patient->fresh(), 'results.acknowledge');
             $result = InvestigationResult::where('patient_id', $patient->id)->lockForUpdate()->findOrFail($resultId);
-            abort_unless($result->owner_id === $request->user()->id, 403, 'Only the named result owner can acknowledge this result.');
+            abort_unless($result->effectiveOwnerId() === $request->user()->id, 403, 'Only the named result owner can acknowledge this result.');
             abort_if(InvestigationResult::where('supersedes_id', $result->id)->exists(), 409, 'A corrected result replaced this record.');
             abort_unless($result->status === 'pending' && $result->version === (int) $data['version'], 409, 'The result state changed. Reload before acknowledging it.');
             abort_unless(hash_equals($result->content_hash, $result->digest()), 409, 'Result integrity check failed.');
@@ -195,7 +195,7 @@ class InvestigationController extends Controller
             Patient::whereKey($patient->id)->lockForUpdate()->firstOrFail();
             PatientAccess::enforce($request, $patient->fresh(), 'results.acknowledge');
             $result = InvestigationResult::where('patient_id', $patient->id)->lockForUpdate()->findOrFail($resultId);
-            abort_unless($result->owner_id === $request->user()->id && $result->status === 'acknowledged' && $result->version === (int) $data['version'], 409, 'Only the named owner can complete current acknowledged follow-up.');
+            abort_unless($result->effectiveOwnerId() === $request->user()->id && $result->status === 'acknowledged' && $result->version === (int) $data['version'], 409, 'Only the named owner can complete current acknowledged follow-up.');
             abort_unless(($result->acknowledgement['follow_up_required'] ?? null) === 'yes', 409, 'This result has no outstanding follow-up to complete.');
             abort_if(InvestigationResult::where('supersedes_id', $result->id)->exists(), 409, 'A corrected result replaced this record.');
             abort_unless(hash_equals($result->content_hash, $result->digest()), 409, 'Result integrity check failed.');

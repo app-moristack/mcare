@@ -16,9 +16,11 @@ const sbarFields = {
 
 type SbarContent = Record<keyof typeof sbarFields, string>;
 type Clinician = { id: number; name: string };
-type Recipient = Clinician & { canAcceptTransfers?: boolean };
-type TransferTask = { id: number; title: string };
-type AvailableTransferTask = TransferTask & { version: number };
+type Recipient = Clinician & { canAcceptTransfers?: boolean; canAcceptResultTransfers?: boolean };
+type TransferItem = { id: number; title: string };
+type AvailableTransferItem = TransferItem & { version: number };
+
+type TransferSelection = Pick<AvailableTransferItem, 'id' | 'version'>;
 
 type Handover = {
     id: number;
@@ -32,17 +34,25 @@ type Handover = {
     acknowledged_at: string | null;
     acknowledgement: string | null;
     canAcknowledge: boolean;
-    transfer_tasks: TransferTask[];
+    transfer_tasks: TransferItem[];
+    transfer_results: TransferItem[];
 };
 
-export type HandoverData = { canCreate: boolean; recipients: Recipient[]; records: Handover[]; transferTasks?: AvailableTransferTask[] };
+export type HandoverData = {
+    canCreate: boolean;
+    recipients: Recipient[];
+    records: Handover[];
+    transferTasks?: AvailableTransferItem[];
+    transferResults?: AvailableTransferItem[];
+};
 
 const emptyHandover = {
     request_id: '',
     priority: 'routine',
     due_at: '',
     recipient_id: '',
-    transfer_tasks: [] as Pick<AvailableTransferTask, 'id' | 'version'>[],
+    transfer_tasks: [] as TransferSelection[],
+    transfer_results: [] as TransferSelection[],
     situation: '',
     background: '',
     assessment: '',
@@ -53,17 +63,87 @@ const emptyHandover = {
 
 const emptyAcknowledgement = { acknowledgement: '', password: '', declaration: false as boolean, accept_transfer: false as boolean };
 const maxTransferTasks = 20;
+const maxTransferResults = 20;
 const selectClass = 'border-input bg-background w-full min-w-0 rounded-md border p-2 text-base';
 
-function TransferTaskList({ tasks }: { tasks: TransferTask[] }) {
+function TransferList({ items }: { items: TransferItem[] }) {
     return (
         <ul className="list-disc space-y-1 ps-5">
-            {tasks.map((task) => (
+            {items.map((task) => (
                 <li className="break-words" key={task.id}>
                     {task.title}
                 </li>
             ))}
         </ul>
+    );
+}
+
+function OfferTransfers({
+    items,
+    selected,
+    onChange,
+    eligible,
+    label,
+    limit,
+    hintId,
+}: {
+    items: AvailableTransferItem[];
+    selected: TransferSelection[];
+    onChange: (items: TransferSelection[]) => void;
+    eligible: boolean;
+    label: string;
+    limit: number;
+    hintId: string;
+}) {
+    if (!items.length) return null;
+
+    const selectedIds = new Set(selected.map(({ id }) => id));
+
+    return (
+        <fieldset className="min-w-0 space-y-2 rounded-md border p-3 text-sm">
+            <legend className="px-1 font-medium">Offer {label} for transfer</legend>
+            <p className="text-muted-foreground" id={hintId}>
+                {eligible
+                    ? `Select up to ${limit}. You remain responsible for follow-up until the recipient accepts.`
+                    : `Choose a recipient who can accept responsibility for these ${label} and any other items you selected.`}
+            </p>
+            <div className="max-h-52 space-y-1 overflow-y-auto">
+                {items.map(({ id, title, version }) => (
+                    <label className="hover:bg-muted/50 flex min-h-11 min-w-0 items-start gap-2 rounded-md px-2 py-3" key={id}>
+                        <input
+                            className="mt-0.5"
+                            type="checkbox"
+                            aria-describedby={hintId}
+                            disabled={!selectedIds.has(id) && (!eligible || selected.length >= limit)}
+                            checked={selectedIds.has(id)}
+                            onChange={(event) =>
+                                onChange(event.target.checked ? [...selected, { id, version }] : selected.filter((item) => item.id !== id))
+                            }
+                        />
+                        <span className="min-w-0 break-words">{title}</span>
+                    </label>
+                ))}
+            </div>
+        </fieldset>
+    );
+}
+
+function TransferItems({ tasks, results }: { tasks: TransferItem[]; results: TransferItem[] }) {
+    return (
+        <>
+            {tasks.length > 0 && (
+                <div className="space-y-1">
+                    <p className="font-medium">Care tasks</p>
+                    <TransferList items={tasks} />
+                </div>
+            )}
+            {results.length > 0 && (
+                <div className="space-y-1">
+                    <p className="font-medium">Investigation results</p>
+                    <TransferList items={results} />
+                </div>
+            )}
+        </>
     );
 }
 
@@ -109,9 +189,14 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
     const openEpisodes = episodes.filter((episode) => !episode.discharged_at);
     const episodeTitles = new Map(episodes.map((episode) => [episode.id, episode.title]));
     const transferTasks = handover.transferTasks ?? [];
-    const transferLimitReached = create.data.transfer_tasks.length >= maxTransferTasks;
+    const transferResults = handover.transferResults ?? [];
+    const hasTasks = create.data.transfer_tasks.length > 0;
+    const hasResults = create.data.transfer_results.length > 0;
     const recipient = handover.recipients.find(({ id }) => String(id) === create.data.recipient_id);
-    const canOfferTasks = recipient ? !!recipient.canAcceptTransfers : handover.recipients.some((person) => person.canAcceptTransfers);
+    const possibleRecipients = recipient ? [recipient] : handover.recipients;
+    const canOfferTasks = possibleRecipients.some((person) => person.canAcceptTransfers && (!hasResults || person.canAcceptResultTransfers));
+    const canOfferResults = possibleRecipients.some((person) => person.canAcceptResultTransfers && (!hasTasks || person.canAcceptTransfers));
+    const acceptingTransfer = !!selected && (selected.transfer_tasks.length > 0 || selected.transfer_results.length > 0);
 
     return (
         <section className="surface min-w-0 space-y-4 p-4 sm:p-6" aria-labelledby="episode-handover-heading">
@@ -183,14 +268,12 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
                             )}
                         </dl>
                     </details>
-                    {record.transfer_tasks.length > 0 && (
+                    {(record.transfer_tasks.length > 0 || record.transfer_results.length > 0) && (
                         <div className="space-y-2 text-sm">
-                            <h4 className="font-medium">
-                                {record.acknowledged_at ? 'Tasks accepted with this handover' : 'Tasks offered for transfer'}
-                            </h4>
-                            <TransferTaskList tasks={record.transfer_tasks} />
+                            <h4 className="font-medium">{record.acknowledged_at ? 'Accepted transfers' : 'Offered transfers'}</h4>
+                            <TransferItems tasks={record.transfer_tasks} results={record.transfer_results} />
                             {!record.acknowledged_at && (
-                                <p className="text-muted-foreground">These tasks stay with their current owner until the recipient accepts.</p>
+                                <p className="text-muted-foreground">The current owners remain responsible until the recipient accepts.</p>
                             )}
                         </div>
                     )}
@@ -268,10 +351,14 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
                                     <option
                                         key={person.id}
                                         value={person.id}
-                                        disabled={create.data.transfer_tasks.length > 0 && !person.canAcceptTransfers}
+                                        disabled={(hasTasks && !person.canAcceptTransfers) || (hasResults && !person.canAcceptResultTransfers)}
                                     >
                                         {person.name}
-                                        {transferTasks.length > 0 && !person.canAcceptTransfers ? ' (handover only)' : ''}
+                                        {(transferTasks.length > 0 || transferResults.length > 0) &&
+                                        !person.canAcceptTransfers &&
+                                        !person.canAcceptResultTransfers
+                                            ? ' (handover only)'
+                                            : ''}
                                     </option>
                                 ))}
                             </select>
@@ -307,44 +394,24 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
                                 />
                             </label>
                         ))}
-                        {transferTasks.length > 0 && (
-                            <fieldset className="min-w-0 space-y-2 rounded-md border p-3 text-sm">
-                                <legend className="px-1 font-medium">Offer care tasks for transfer</legend>
-                                <p className="text-muted-foreground" id="handover-transfer-hint">
-                                    {canOfferTasks
-                                        ? `Select up to ${maxTransferTasks} tasks. You remain responsible for them until the recipient accepts.`
-                                        : 'Choose a recipient who can accept care tasks to offer a transfer.'}
-                                </p>
-                                <div className="max-h-52 space-y-1 overflow-y-auto">
-                                    {transferTasks.map((task) => (
-                                        <label
-                                            className="hover:bg-muted/50 flex min-h-11 min-w-0 items-start gap-2 rounded-md px-2 py-3"
-                                            key={task.id}
-                                        >
-                                            <input
-                                                className="mt-0.5"
-                                                type="checkbox"
-                                                aria-describedby="handover-transfer-hint"
-                                                disabled={
-                                                    !canOfferTasks ||
-                                                    (transferLimitReached && !create.data.transfer_tasks.some(({ id }) => id === task.id))
-                                                }
-                                                checked={create.data.transfer_tasks.some(({ id }) => id === task.id)}
-                                                onChange={(event) =>
-                                                    create.setData(
-                                                        'transfer_tasks',
-                                                        event.target.checked
-                                                            ? [...create.data.transfer_tasks, { id: task.id, version: task.version }]
-                                                            : create.data.transfer_tasks.filter(({ id }) => id !== task.id),
-                                                    )
-                                                }
-                                            />
-                                            <span className="min-w-0 break-words">{task.title}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            </fieldset>
-                        )}
+                        <OfferTransfers
+                            items={transferTasks}
+                            selected={create.data.transfer_tasks}
+                            onChange={(items) => create.setData('transfer_tasks', items)}
+                            eligible={canOfferTasks}
+                            label="care tasks"
+                            limit={maxTransferTasks}
+                            hintId="handover-task-transfer-hint"
+                        />
+                        <OfferTransfers
+                            items={transferResults}
+                            selected={create.data.transfer_results}
+                            onChange={(items) => create.setData('transfer_results', items)}
+                            eligible={canOfferResults}
+                            label="investigation results"
+                            limit={maxTransferResults}
+                            hintId="handover-result-transfer-hint"
+                        />
                         <Signature
                             password={create.data.password}
                             declaration={create.data.declaration}
@@ -408,11 +475,11 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
                                     onChange={(event) => acknowledge.setData('acknowledgement', event.target.value)}
                                 />
                             </label>
-                            {selected.transfer_tasks.length > 0 && (
+                            {acceptingTransfer && (
                                 <fieldset className="min-w-0 space-y-3 rounded-md border p-3 text-sm">
-                                    <legend className="px-1 font-medium">Accept task responsibility</legend>
-                                    <p>Signing this handover transfers the following tasks to you when you accept them below.</p>
-                                    <TransferTaskList tasks={selected.transfer_tasks} />
+                                    <legend className="px-1 font-medium">Accept follow-up responsibility</legend>
+                                    <p>When you sign and accept this handover, you take responsibility for the listed work.</p>
+                                    <TransferItems tasks={selected.transfer_tasks} results={selected.transfer_results} />
                                     <label className="flex min-h-11 items-start gap-2 py-2 font-medium">
                                         <input
                                             className="mt-1"
@@ -421,7 +488,7 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
                                             checked={acknowledge.data.accept_transfer}
                                             onChange={(event) => acknowledge.setData('accept_transfer', event.target.checked)}
                                         />
-                                        <span>I accept responsibility for all listed tasks.</span>
+                                        <span>I accept responsibility for all listed follow-up.</span>
                                     </label>
                                 </fieldset>
                             )}
@@ -433,7 +500,7 @@ export default function EpisodeHandovers({ base, episodes, handover }: { base: s
                                 label="I confirm I reviewed this handover and recorded my acknowledgement."
                             />
                             <Button type="submit" disabled={acknowledge.processing}>
-                                {selected.transfer_tasks.length > 0 ? 'Sign and accept tasks' : 'Sign acknowledgement'}
+                                {acceptingTransfer ? 'Sign and accept transfers' : 'Sign acknowledgement'}
                             </Button>
                         </form>
                     )}
