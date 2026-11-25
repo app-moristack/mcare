@@ -3,6 +3,7 @@
 use App\Http\Controllers\AssessmentController;
 use App\Http\Controllers\AttendanceReviewController;
 use App\Http\Controllers\CarePortalController;
+use App\Http\Controllers\ChecklistController;
 use App\Http\Controllers\ClinicalObservationController;
 use App\Http\Controllers\ClinicalRecordController;
 use App\Http\Controllers\DashboardController;
@@ -110,6 +111,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::patch('/workspace/team/applications/{id}', [OperationsController::class, 'reviewApplication']);
         Route::post('/workspace/team/memberships', [OperationsController::class, 'addMembership']);
         Route::patch('/workspace/team/memberships/{id}', [OperationsController::class, 'membership']);
+        Route::get('/workspace/checklists', [ChecklistController::class, 'index']);
+        Route::post('/workspace/checklists', [ChecklistController::class, 'store']);
+        Route::post('/workspace/checklists/{template}/versions', [ChecklistController::class, 'storeVersion'])->whereNumber('template');
+        Route::post('/workspace/checklists/{template}/versions/{version}/publish', [ChecklistController::class, 'publish'])->whereNumber(['template', 'version']);
         Route::get('/workspace/{module}', [OperationsController::class, 'index'])->name('operations.index');
         Route::post('/workspace/{module}', [OperationsController::class, 'store']);
         Route::patch('/workspace/{module}/{id}', [OperationsController::class, 'update']);

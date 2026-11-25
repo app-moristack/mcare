@@ -8,6 +8,7 @@ use App\Models\AttendanceReview;
 use App\Models\CareEpisode;
 use App\Models\CarePlan;
 use App\Models\CareTask;
+use App\Models\ChecklistTemplate;
 use App\Models\ClinicalObservation;
 use App\Models\DocumentExport;
 use App\Models\EpisodeHandover;
@@ -447,6 +448,24 @@ class DemoDataSeeder extends Seeder
                 'due_at' => now()->addDays(2),
                 'handover_transferable' => true,
             ]);
+            $checklist = ChecklistTemplate::firstOrCreate(['organisation_id' => $org->id, 'request_id' => $this->uuid('sop-checklist')], [
+                'title' => 'Demo visit coordination checklist', 'created_by' => $users['coordinator']->id,
+            ]);
+            foreach ([
+                1 => ['Confirm the synthetic appointment reference.', 'Record the agreed demo contact channel.'],
+                2 => ['Confirm the synthetic appointment reference and scheduled time.', 'Record the agreed demo contact channel.', 'Check that a synthetic follow-up task has an assigned owner.'],
+                3 => ['Confirm the synthetic appointment reference and scheduled time.', 'Record the demo contact channel and named operational backup.'],
+            ] as $number => $steps) {
+                $version = $checklist->versions()->firstOrCreate(['version' => $number], [
+                    'status' => 'draft', 'steps' => $steps, 'created_by' => $users['coordinator']->id,
+                ]);
+                if ($version->wasRecentlyCreated && $number < 3) {
+                    $version->update([
+                        'status' => 'published', 'published_by' => $users['coordinator']->id,
+                        'published_at' => now()->subDays(3 - $number), 'content_hash' => $version->digest(),
+                    ]);
+                }
+            }
             DB::table('operation_notifications')->updateOrInsert(['deduplication_key' => 'demo-welcome-'.$org->id], ['organisation_id' => $org->id, 'user_id' => $users['coordinator']->id, 'message' => 'Synthetic demo: review the overdue coordination task.', 'url' => '/workspace/tasks', 'created_at' => now(), 'updated_at' => now()]);
             if (! DB::table('audit_events')->where('organisation_id', $org->id)->where('event', 'demo.seeded')->exists()) {
                 DB::table('audit_events')->insert(['organisation_id' => $org->id, 'actor_id' => $admin->id, 'event' => 'demo.seeded', 'created_at' => now()]);
