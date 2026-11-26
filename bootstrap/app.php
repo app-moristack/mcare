@@ -1,5 +1,6 @@
 <?php
 
+use App\Exceptions\RejectedInertiaSubmission;
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\RememberInertiaVisit;
@@ -26,5 +27,5 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        //
+        $exceptions->render(new RejectedInertiaSubmission);
     })->create();

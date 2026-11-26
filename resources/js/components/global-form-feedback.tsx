@@ -15,7 +15,10 @@ const fieldName = (key: string) => {
 export default function GlobalFormFeedback() {
     const { errors, flash } = usePage<SharedData>().props;
     const validationMessages = useMemo(
-        () => Array.from(new Set(Object.entries(errors ?? {}).map(([key, message]) => `${fieldName(key)}: ${String(message)}`))),
+        () =>
+            Array.from(
+                new Set(Object.entries(errors ?? {}).map(([key, message]) => (key === 'form' ? String(message) : `${fieldName(key)}: ${String(message)}`))),
+            ),
         [errors],
     );
     const messages = validationMessages.length ? validationMessages : flash?.error ? [flash.error] : [];

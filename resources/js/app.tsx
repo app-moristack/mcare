@@ -5,12 +5,15 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { route as routeFn } from 'ziggy-js';
 import { initializeTheme } from './hooks/use-appearance';
+import { preserveRejectedForms } from './lib/preserve-rejected-forms';
 
 declare global {
     const route: typeof routeFn;
 }
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+
+preserveRejectedForms();
 
 createInertiaApp({
     title: (title) => `${title} - ${appName}`,
